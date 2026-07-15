@@ -112,6 +112,16 @@
   button.key.nav .main{font-size:16px}
   body.shift-on button.key.shiftkey{box-shadow:0 0 0 2px var(--shift),0 2px 0 rgba(40,44,50,.45)}
   body.alpha-on button.key.alphakey{box-shadow:0 0 0 2px var(--alpha),0 2px 0 rgba(40,44,50,.45)}
+  /* SHIFT held: swap labels — yellow shift label grows to center, white primary shrinks to upper-left. Colors unchanged. */
+  body.shift-on button.key.hassh .main{
+    position:absolute;top:2px;left:3px;right:auto;margin-top:0;
+    font-size:8px;line-height:1;
+  }
+  body.shift-on button.key.hassh .sh{
+    position:static;top:auto;left:auto;
+    margin-top:5px;font-size:clamp(11px,1.75vh,15px);
+    text-align:center;width:100%;
+  }
   sup{font-size:.7em;vertical-align:super}
 
   /* history overlay */
@@ -276,7 +286,7 @@ const pad=document.getElementById("pad");
 pad.innerHTML=KEYS.map(d=>{
   const sh=d.sh?`<span class="sh">${esc(d.sh)}</span>`:"";
   const al=d.al?`<span class="al">${esc(d.al)}</span>`:"";
-  return `<button class="key ${d.cls}" data-k="${d.k}">${sh}${al}<span class="main">${esc(d.main)}</span></button>`;
+  return `<button class="key ${d.cls}${d.sh?" hassh":""}" data-k="${d.k}">${sh}${al}<span class="main">${esc(d.main)}</span></button>`;
 }).join("");
 const KMAP=Object.fromEntries(KEYS.map(d=>[d.k,d]));
 
