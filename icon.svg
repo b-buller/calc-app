@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#232830"/>
+  <rect x="96" y="60" width="320" height="392" rx="40" fill="#31353d" stroke="#454b55" stroke-width="4"/>
+  <rect x="132" y="96" width="248" height="96" rx="12" fill="#b9c7a6" stroke="#3c4a2e" stroke-width="6"/>
+  <text x="360" y="168" font-family="Courier New, monospace" font-size="60" font-weight="700" fill="#1c2417" text-anchor="end">0.</text>
+  <g fill="#3d434d" stroke="#5a616d" stroke-width="3">
+    <rect x="132" y="220" width="52" height="46" rx="10"/>
+    <rect x="198" y="220" width="52" height="46" rx="10"/>
+    <rect x="264" y="220" width="52" height="46" rx="10"/>
+    <rect x="330" y="220" width="52" height="46" rx="10"/>
+    <rect x="132" y="284" width="52" height="46" rx="10"/>
+    <rect x="198" y="284" width="52" height="46" rx="10"/>
+    <rect x="264" y="284" width="52" height="46" rx="10"/>
+    <rect x="132" y="348" width="52" height="46" rx="10"/>
+    <rect x="198" y="348" width="52" height="46" rx="10"/>
+    <rect x="264" y="348" width="52" height="46" rx="10"/>
+  </g>
+  <rect x="330" y="284" width="52" height="110" rx="10" fill="#2f6db0" stroke="#4a8fd6" stroke-width="3"/>
+</svg>

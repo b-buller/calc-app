@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#d3d8dd">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Calc">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Calculator</title>
+<style>
+  :root{
+    /* fx-115ES light silver theme */
+    --case:#eef0f2; --case2:#c2c8ce; --case-edge:#a7aeb6;
+    --lcd:#c9d0c1; --lcd-edge:#828d78; --lcd-ink:#1b1f19;
+    --key-txt:#20242a;
+    --grey:#727a86; --grey2:#5c636e; --grey-edge:#474d57;
+    --blk:#23272d; --blk2:#14171b; --blk-edge:#050607;
+    --red:#8f3b52; --red2:#783044; --red-edge:#5c2537;
+    --shift:#d79a2b; --alpha:#d15a68; --func:#f4f6f8;
+    --shadow:rgba(60,66,74,.35);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--case2);
+    color:var(--key-txt);
+    display:flex;align-items:stretch;justify-content:center;
+    height:100%;height:100dvh;overflow:hidden;
+    overscroll-behavior:none;touch-action:manipulation;
+  }
+  .calc{
+    position:relative;
+    width:100%;max-width:560px;height:100%;
+    background:linear-gradient(165deg,#f3f4f6 0%,#d3d8dd 45%,#bcc3ca 100%);
+    padding:calc(env(safe-area-inset-top) + 12px) 12px calc(env(safe-area-inset-bottom) + 14px);
+    display:flex;flex-direction:column;gap:12px;
+    box-shadow:0 0 40px var(--shadow),inset 0 1px 0 rgba(255,255,255,.7);
+  }
+
+  /* LCD */
+  .lcd{
+    background:linear-gradient(180deg,#d7dccf,#c2cab7);
+    border:2px solid var(--lcd-edge);
+    border-radius:6px;
+    padding:8px 10px 6px;
+    box-shadow:inset 0 2px 5px rgba(70,80,60,.4),0 1px 0 rgba(255,255,255,.6);
+    color:var(--lcd-ink);
+    display:flex;flex-direction:column;
+    flex:0 0 auto;min-height:20vh;
+  }
+  .flags{display:flex;align-items:center;gap:9px;font-size:11px;font-weight:700;min-height:15px;letter-spacing:.5px;font-family:"Courier New",monospace}
+  .flags span{visibility:hidden}
+  .flags span.on{visibility:visible}
+  .histbtn{margin-left:auto;visibility:visible;background:none;border:none;color:var(--lcd-ink);font-size:16px;line-height:1;cursor:pointer;padding:0 2px;opacity:.85}
+  #mf{
+    flex:1 1 auto;width:100%;min-height:2.2em;
+    border:none;background:transparent;color:var(--lcd-ink);
+    font-size:24px;overflow:auto;
+    --caret-color:#1b1f19;--selection-background-color:#9db08a;--contains-highlight-background-color:transparent;
+    --smart-fence-color:#1b1f19;
+  }
+  #out{
+    width:100%;border:none;background:transparent;color:var(--lcd-ink);
+    font-size:30px;text-align:right;min-height:1.2em;pointer-events:none;
+    display:flex;justify-content:flex-end;
+  }
+  math-field{outline:none}
+  math-field::part(virtual-keyboard-toggle),
+  math-field::part(menu-toggle){display:none}
+
+  /* keypad */
+  .pad{
+    flex:1 1 auto;min-height:0;
+    display:grid;grid-template-columns:repeat(5,1fr);
+    grid-auto-rows:1fr;gap:clamp(4px,1.5vw,10px);
+  }
+  button.key{
+    position:relative;height:100%;min-height:34px;
+    border:1px solid var(--grey-edge);
+    background:linear-gradient(180deg,var(--grey),var(--grey2));
+    color:var(--func);border-radius:8px;padding:0;
+    font-size:clamp(12px,1.9vh,17px);font-weight:600;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    box-shadow:0 2px 0 rgba(40,44,50,.45),inset 0 1px 0 rgba(255,255,255,.25);
+    user-select:none;transition:transform .04s,filter .04s;line-height:1.05;
+  }
+  button.key:active{transform:translateY(2px);filter:brightness(1.12);box-shadow:0 0 0 rgba(0,0,0,.4)}
+  button.key .sh{position:absolute;top:2px;left:3px;font-size:8px;color:var(--shift);font-weight:700}
+  button.key .al{position:absolute;top:2px;right:3px;font-size:8px;color:var(--alpha);font-weight:700}
+  button.key .main{margin-top:5px;color:inherit;pointer-events:none}
+  button.key.fn .main{font-size:clamp(11px,1.75vh,15px)}
+  button.key.num,button.key.op,button.key.eq{
+    background:linear-gradient(180deg,var(--blk),var(--blk2));border-color:var(--blk-edge);
+    box-shadow:0 2px 0 rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.12);
+  }
+  button.key.num .main,button.key.op .main{color:#fff;font-size:clamp(16px,2.5vh,22px)}
+  button.key.eq .main{color:#fff;font-size:clamp(18px,2.8vh,24px)}
+  button.key.danger{
+    background:linear-gradient(180deg,var(--red),var(--red2));border-color:var(--red-edge);
+    box-shadow:0 2px 0 rgba(60,20,34,.5),inset 0 1px 0 rgba(255,255,255,.18);
+  }
+  button.key.danger .main,button.key.danger .sh{color:#fdeaf0}
+  button.key.shiftkey{background:linear-gradient(180deg,#e0e3e7,#c4cad0);border-color:#aeb5bd}
+  button.key.shiftkey .main{color:var(--shift)}
+  button.key.alphakey{background:linear-gradient(180deg,#e0e3e7,#c4cad0);border-color:#aeb5bd}
+  button.key.alphakey .main{color:var(--alpha)}
+  button.key.nav .main{font-size:16px}
+  body.shift-on button.key.shiftkey{box-shadow:0 0 0 2px var(--shift),0 2px 0 rgba(40,44,50,.45)}
+  body.alpha-on button.key.alphakey{box-shadow:0 0 0 2px var(--alpha),0 2px 0 rgba(40,44,50,.45)}
+  sup{font-size:.7em;vertical-align:super}
+
+  /* history overlay */
+  .hist{position:absolute;inset:0;background:rgba(226,230,234,.98);backdrop-filter:blur(2px);
+    display:flex;flex-direction:column;z-index:20;
+    padding:calc(env(safe-area-inset-top) + 10px) 14px calc(env(safe-area-inset-bottom) + 14px)}
+  .hist[hidden]{display:none}
+  .hist-head{display:flex;justify-content:space-between;align-items:center;
+    padding-bottom:10px;border-bottom:1px solid var(--case-edge);font-weight:700;color:#2a2f36}
+  .hist-head>div{display:flex;gap:8px}
+  .hist-x{background:linear-gradient(180deg,var(--grey),var(--grey2));border:1px solid var(--grey-edge);color:#fff;
+    border-radius:7px;padding:6px 12px;font-size:13px;cursor:pointer}
+  .hist-list{flex:1;overflow-y:auto;margin-top:8px;display:flex;flex-direction:column;gap:6px}
+  .hist-item{background:#fff;border:1px solid var(--case-edge);border-radius:9px;
+    padding:8px 12px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+  .hist-item math-field{pointer-events:none;background:transparent;border:none;--caret-color:transparent}
+  .hist-item .he{font-size:15px;color:#5a626c}
+  .hist-item .hr{font-size:20px;color:#1b1f25;font-weight:700}
+  .hist-empty{color:#8a929c;text-align:center;margin-top:30px;font-size:14px}
+  @media (max-width:340px){button.key{font-size:12px}}
+</style>
+</head>
+<body>
+  <div class="calc" role="application" aria-label="Scientific calculator">
+    <div class="lcd">
+      <div class="flags">
+        <span id="fShift">S</span>
+        <span id="fAlpha">A</span>
+        <span id="fM">M</span>
+        <span id="fMode" class="on">DEG</span>
+        <button id="histBtn" class="histbtn" aria-label="History">&#9719;</button>
+      </div>
+      <div id="mfWrap"></div>
+      <div id="outWrap"></div>
+    </div>
+
+    <div class="pad" id="pad"></div>
+
+    <div class="hist" id="hist" hidden>
+      <div class="hist-head">
+        <span>History</span>
+        <div>
+          <button id="histClear" class="hist-x">Clear</button>
+          <button id="histClose" class="hist-x">Close</button>
+        </div>
+      </div>
+      <div class="hist-list" id="histList"></div>
+    </div>
+  </div>
+
+<script type="module">
+import { MathfieldElement } from "./vendor/mathlive/mathlive.mjs";
+import { ComputeEngine } from "./vendor/compute-engine/compute-engine.js";
+
+/* fontsDirectory resolves relative to mathlive.mjs; fonts sit beside it */
+MathfieldElement.fontsDirectory = "./fonts";
+MathfieldElement.soundsDirectory = null;
+
+const ce = new ComputeEngine();
+MathfieldElement.computeEngine = ce;
+
+/* ---------- state ---------- */
+const S={shift:false,alpha:false,mode:"DEG",ansLatex:"",mem:0,sd:"exact",lastExact:null,lastDec:null,hist:[]};
+const HKEY="calc-history";
+const MODES=["DEG","RAD","GRAD"];
+const ANG={DEG:"deg",RAD:"rad",GRAD:"grad"};
+
+/* ---------- input field ---------- */
+const mf=new MathfieldElement();
+mf.id="mf";
+mf.mathVirtualKeyboardPolicy="manual";
+mf.smartMode=false;
+mf.smartFence=true;
+mf.popoverPolicy="off";
+mf.placeholderSymbol="▯";
+document.getElementById("mfWrap").appendChild(mf);
+
+const out=new MathfieldElement();
+out.id="out";
+out.readOnly=true;
+out.mathVirtualKeyboardPolicy="manual";
+document.getElementById("outWrap").appendChild(out);
+
+setTimeout(()=>mf.focus(),0);
+
+/* ---------- key definitions (fx-115ES-ish full layout) ---------- */
+// t: 'ins' latex insert | 'cmd' mathfield command | 'act' custom action
+const K=(k,main,cls,t,val,sh,shval,al)=>({k,main,cls,t,val,sh,shval,al});
+const KEYS=[
+  // function block
+  K("shift","SHIFT","shiftkey","act"),
+  K("alpha","ALPHA","alphakey","act"),
+  K("mode","MODE","fn","act"),
+  K("calc","CALC","fn","act",null,"SOLVE"),
+  K("intg","∫dx","fn","act",null,"d/dx"),
+
+  K("left","◀","fn nav","cmd","moveToPreviousChar"),
+  K("up","▲","fn nav","cmd","moveUp"),
+  K("down","▼","fn nav","cmd","moveDown"),
+  K("right","▶","fn nav","cmd","moveToNextChar"),
+  K("sd","S⇔D","fn","act"),
+
+  K("inv","x⁻¹","fn","ins","^{-1}"),
+  K("frac","▯/▯","fn","ins","\\frac{#0}{#0}","▯⌐","\\frac{#0}{#0}"),
+  K("sqrt","√▯","fn","ins","\\sqrt{#0}","∛","\\sqrt[3]{#0}"),
+  K("sq","x²","fn","ins","^{2}","x³","^{3}"),
+  K("pow","x▯","fn","ins","^{#?}","ˣ√","\\sqrt[#?]{#?}"),
+
+  K("log","log","fn","ins","\\log(#0)","10ˣ","10^{#?}"),
+  K("ln","ln","fn","ins","\\ln(#0)","eˣ","e^{#?}"),
+  K("lp","(","fn","ins","(","%","\\%"),
+  K("rp",")","fn","ins",")",",",","),
+  K("neg","(−)","fn","ins","-"),
+
+  K("sin","sin","fn","ins","\\sin(#0)","sin⁻¹","\\arcsin(#0)",null),
+  K("cos","cos","fn","ins","\\cos(#0)","cos⁻¹","\\arccos(#0)",null),
+  K("tan","tan","fn","ins","\\tan(#0)","tan⁻¹","\\arctan(#0)",null),
+  K("hyp","hyp","fn","act"),
+  K("dms","°′″","fn","act",null,"DRG"),
+
+  K("rcl","RCL","fn","act",null,"STO"),
+  K("eng","ENG","fn","act"),
+  K("pi","π","fn","ins","\\pi"),
+  K("euler","e","fn","ins","e"),
+  K("mplus","M+","fn","act",null,"M−"),
+
+  // number block
+  K("7","7","num","ins","7"),
+  K("8","8","num","ins","8"),
+  K("9","9","num","ins","9"),
+  K("del","DEL","danger","act"),
+  K("ac","AC","danger","act"),
+
+  K("4","4","num","ins","4"),
+  K("5","5","num","ins","5"),
+  K("6","6","num","ins","6"),
+  K("mul","×","op","ins","\\times","nCr","\\binom{#0}{#0}"),
+  K("div","÷","op","ins","\\div","nPr",null),
+
+  K("1","1","num","ins","1"),
+  K("2","2","num","ins","2"),
+  K("3","3","num","ins","3"),
+  K("add","+","op","ins","+","Pol",null),
+  K("sub","−","op","ins","-","Rec",null),
+
+  K("0","0","num","ins","0"),
+  K("dot",".","num","ins",".","Ran#",null),
+  K("exp","×10ˣ","num","ins","\\times10^{#?}"),
+  K("ans","Ans","num","act"),
+  K("eq","=","eq","act"),
+];
+
+/* ---------- build keypad ---------- */
+const pad=document.getElementById("pad");
+pad.innerHTML=KEYS.map(d=>{
+  const sh=d.sh?`<span class="sh">${esc(d.sh)}</span>`:"";
+  const al=d.al?`<span class="al">${esc(d.al)}</span>`:"";
+  return `<button class="key ${d.cls}" data-k="${d.k}">${sh}${al}<span class="main">${esc(d.main)}</span></button>`;
+}).join("");
+const KMAP=Object.fromEntries(KEYS.map(d=>[d.k,d]));
+
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
+/* keep caret in field when tapping keypad */
+pad.addEventListener("pointerdown",e=>{if(e.target.closest("button.key"))e.preventDefault();});
+
+pad.addEventListener("click",e=>{
+  const btn=e.target.closest("button.key");if(!btn)return;
+  press(KMAP[btn.dataset.k]);
+  if(navigator.vibrate)navigator.vibrate(6);
+});
+
+function press(d){
+  if(!d)return;
+  const shifted=S.shift;
+  // modifier toggles
+  if(d.k==="shift"){S.shift=!S.shift;S.alpha=false;flags();return;}
+  if(d.k==="alpha"){S.alpha=!S.alpha;S.shift=false;flags();return;}
+
+  if(d.t==="ins"){
+    const latex=(shifted&&d.shval)?d.shval:d.val;
+    if(latex!=null)mf.insert(latex,{selectionMode:"placeholder",focus:true});
+  }else if(d.t==="cmd"){
+    mf.executeCommand(d.val);
+  }else if(d.t==="act"){
+    action(d.k,shifted);
+  }
+  S.shift=false;S.alpha=false;flags();
+  mf.focus();
+}
+
+function action(k,shifted){
+  switch(k){
+    case"mode":S.mode=MODES[(MODES.indexOf(S.mode)+1)%3];break;
+    case"sd":S.sd=S.sd==="exact"?"decimal":"exact";showResult();break;
+    case"del":mf.executeCommand("deleteBackward");break;
+    case"ac":mf.setValue("");out.setValue("");S.lastExact=S.lastDec=null;break;
+    case"eq":evaluate();break;
+    case"ans":if(S.ansLatex)mf.insert(S.ansLatex,{focus:true});break;
+    case"mplus":memAdd(shifted?-1:1);break;
+    case"rcl":if(shifted){/* STO stub */}else if(S.mem)mf.insert(String(S.mem),{focus:true});break;
+    // stubs (wired later): calc, intg, hyp, dms, eng
+    default:break;
+  }
+}
+
+/* ---------- evaluate ---------- */
+function evaluate(){
+  const latex=mf.getValue("latex");
+  if(!latex||/\\placeholder/.test(latex)){return;}
+  try{
+    ce.angularUnit=ANG[S.mode];
+    const expr=ce.parse(latex);
+    const dec=expr.N();
+    const ex=expr.evaluate();
+    if(dec.isNaN||!isFinite(numOf(dec))){out.setValue("\\text{Math ERROR}");return;}
+    S.lastExact=ex.latex;S.lastDec=dec.latex;
+    S.ansLatex=dec.latex;
+    showResult();
+    pushHistory(latex,dec.latex);
+  }catch(err){
+    out.setValue("\\text{Syntax ERROR}");
+  }
+}
+function numOf(v){try{return typeof v.re==="number"?v.re:Number(v.valueOf());}catch(e){return NaN;}}
+function showResult(){
+  const v=S.sd==="exact"?S.lastExact:S.lastDec;
+  if(v!=null)out.setValue(v);
+}
+function memAdd(sign){
+  const latex=mf.getValue("latex");
+  try{const v=numOf(ce.parse(latex).N());if(isFinite(v)){S.mem+=sign*v;flags();}}catch(e){}
+}
+
+/* ---------- flags ---------- */
+function flags(){
+  document.getElementById("fShift").classList.toggle("on",S.shift);
+  document.getElementById("fAlpha").classList.toggle("on",S.alpha);
+  document.getElementById("fM").classList.toggle("on",S.mem!==0);
+  document.getElementById("fMode").textContent=S.mode;
+  document.body.classList.toggle("shift-on",S.shift);
+  document.body.classList.toggle("alpha-on",S.alpha);
+}
+
+/* ---------- history (localStorage) ---------- */
+const histEl=document.getElementById("hist");
+const histList=document.getElementById("histList");
+function loadHistory(){try{S.hist=JSON.parse(localStorage.getItem(HKEY))||[];}catch(e){S.hist=[];}}
+function saveHistory(){try{localStorage.setItem(HKEY,JSON.stringify(S.hist.slice(0,50)));}catch(e){}}
+function pushHistory(e,r){S.hist.unshift({e,r});if(S.hist.length>50)S.hist.length=50;saveHistory();}
+function renderHistory(){
+  if(!S.hist.length){histList.innerHTML='<div class="hist-empty">No calculations yet</div>';return;}
+  histList.innerHTML=S.hist.map((h,i)=>
+    `<div class="hist-item" data-i="${i}"><div class="he"><math-field read-only>${esc(h.e)}=</math-field></div><div class="hr"><math-field read-only>${esc(h.r)}</math-field></div></div>`
+  ).join("");
+}
+document.getElementById("histBtn").addEventListener("click",()=>{renderHistory();histEl.hidden=false;});
+document.getElementById("histClose").addEventListener("click",()=>histEl.hidden=true);
+document.getElementById("histClear").addEventListener("click",()=>{S.hist=[];saveHistory();renderHistory();});
+histList.addEventListener("click",e=>{
+  const it=e.target.closest(".hist-item");if(!it)return;
+  const h=S.hist[+it.dataset.i];if(!h)return;
+  mf.setValue(h.e);histEl.hidden=true;mf.focus();
+});
+
+/* ---------- physical keyboard passthrough (let MathLive handle) ---------- */
+window.addEventListener("keydown",e=>{
+  if(e.key==="Enter"||e.key==="="){e.preventDefault();evaluate();}
+});
+
+/* ---------- PWA ---------- */
+if("serviceWorker"in navigator){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+
+/* ---------- init ---------- */
+loadHistory();
+flags();
+
+/* ---------- self-check (silent unless fail) ---------- */
+(function selfTest(){
+  const near=(a,b)=>Math.abs(a-b)<1e-9;
+  let ok=true;
+  ce.angularUnit="deg";
+  const cases=[["\\frac{1}{2}+\\frac{1}{3}",5/6],["\\sqrt{9}",3],["2^{10}",1024],["\\sin(30)",0.5],["\\binom{5}{2}",10]];
+  for(const[tex,exp]of cases){
+    try{const v=numOf(ce.parse(tex).N());if(!near(v,exp)){console.error("FAIL",tex,v,"!=",exp);ok=false;}}
+    catch(err){console.error("ERR",tex,err.message);ok=false;}
+  }
+  console.log(ok?"calc self-test: PASS":"calc self-test: FAIL");
+})();
+</script>
+</body>
+</html>
