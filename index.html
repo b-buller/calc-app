@@ -90,9 +90,11 @@
     user-select:none;transition:transform .04s,filter .04s;line-height:1.05;
   }
   button.key:active{transform:translateY(2px);filter:brightness(1.12);box-shadow:0 0 0 rgba(0,0,0,.4)}
-  button.key .sh{position:absolute;top:2px;left:3px;font-size:8px;color:var(--shift);font-weight:700}
+  button.key .sh{position:absolute;top:3px;left:4px;font-size:8px;color:var(--shift);font-weight:700;white-space:nowrap;transform:translate(0,0);
+    transition:top .16s ease,left .16s ease,transform .16s ease,font-size .16s ease}
   button.key .al{position:absolute;top:2px;right:3px;font-size:8px;color:var(--alpha);font-weight:700}
-  button.key .main{margin-top:5px;color:inherit;pointer-events:none}
+  button.key .main{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:inherit;pointer-events:none;white-space:nowrap;
+    transition:top .16s ease,left .16s ease,transform .16s ease,font-size .16s ease}
   button.key.fn .main{font-size:clamp(11px,1.75vh,15px)}
   button.key.num,button.key.op,button.key.eq{
     background:linear-gradient(180deg,var(--blk),var(--blk2));border-color:var(--blk-edge);
@@ -112,15 +114,15 @@
   button.key.nav .main{font-size:16px}
   body.shift-on button.key.shiftkey{box-shadow:0 0 0 2px var(--shift),0 2px 0 rgba(40,44,50,.45)}
   body.alpha-on button.key.alphakey{box-shadow:0 0 0 2px var(--alpha),0 2px 0 rgba(40,44,50,.45)}
-  /* SHIFT held: swap labels — yellow shift label grows to center, white primary shrinks to upper-left. Colors unchanged. */
+  /* SHIFT held: labels animate-swap — yellow shift label slides to center & grows,
+     white primary slides to upper-left & shrinks. Colors unchanged, only size/position. */
   body.shift-on button.key.hassh .main{
-    position:absolute;top:2px;left:3px;right:auto;margin-top:0;
+    top:3px;left:4px;transform:translate(0,0);
     font-size:8px;line-height:1;
   }
   body.shift-on button.key.hassh .sh{
-    position:static;top:auto;left:auto;
-    margin-top:5px;font-size:clamp(11px,1.75vh,15px);
-    text-align:center;width:100%;
+    top:50%;left:50%;transform:translate(-50%,-50%);
+    font-size:clamp(11px,1.75vh,15px);
   }
   sup{font-size:.7em;vertical-align:super}
 
