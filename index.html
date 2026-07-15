@@ -343,12 +343,14 @@ function evaluate(){
     const bad=dec.isNaN||(!isFinite(re)&&!(im&&isFinite(im)))||(im&&!isFinite(im));
     if(bad){out.setValue("\\text{Math ERROR}");return;}
     if(im!==0){
-      // CE's exact complex surds don't reduce (e.g. sqrt(-12)); show numeric a+bi
-      const disp=cplxLatex(re,im);
-      S.lastExact=disp;S.lastDec=disp;S.lastNum=NaN;S.ansLatex=disp;
+      // exact: reduce CE's raw radicals (sqrt(-12) -> 2√3 i); decimal: a+bi
+      S.lastExact=reduceRadicals(ex.latex);
+      S.lastDec=cplxLatex(re,im);
+      S.lastNum=NaN;S.ansLatex=S.lastExact;
     }else{
-      S.lastExact=ex.latex;S.lastDec=fmtNum(re);S.lastNum=re;S.ansLatex=ex.latex;
+      S.lastExact=reduceRadicals(ex.latex);S.lastDec=fmtNum(re);S.lastNum=re;S.ansLatex=ex.latex;
     }
+    S.sd="exact";           // each new result shows exact by default (S⇔D toggles it)
     showResult();
     pushHistory(latex,S.sd==="exact"?S.lastExact:S.lastDec);
   }catch(err){
@@ -356,6 +358,18 @@ function evaluate(){
   }
 }
 function numOf(v){try{return typeof v.re==="number"?v.re:Number(v.valueOf());}catch(e){return NaN;}}
+/* reduce √(integer): factor out largest perfect square. 12 -> 2√3, 4 -> 2, 2 -> √2 */
+function reduceSurd(n){let coef=1,rad=n;for(let f=2;f*f<=rad;f++){while(rad%(f*f)===0){rad/=f*f;coef*=f;}}return{coef,rad};}
+/* rewrite \sqrt{±integer} in a LaTeX string to reduced surd form (imaginary for negatives) */
+function reduceRadicals(s){
+  return String(s).replace(/\\sqrt\{(-?\d+)\}/g,(_,g)=>{
+    let n=parseInt(g,10);const neg=n<0;n=Math.abs(n);
+    const {coef,rad}=reduceSurd(n);
+    if(!neg) return rad===1?String(coef):(coef>1?coef:"")+"\\sqrt{"+rad+"}";
+    if(rad===1) return (coef===1?"":coef)+"\\imaginaryI";
+    return (coef>1?coef:"")+"\\sqrt{"+rad+"}\\imaginaryI";
+  });
+}
 /* round to 10 significant figures (Casio-style) */
 function round10(x){return parseFloat(x.toPrecision(10));}
 function fmtNum(x){return String(round10(x));}
@@ -447,6 +461,9 @@ flags();
   // complex: (2+3i)(1-i) = 5+i
   try{const z=ce.parse("(2+3i)(1-i)").N();if(!near(z.re,5)||!near(z.im,1)){console.error("FAIL complex",z.latex);ok=false;}}
   catch(err){console.error("ERR complex",err.message);ok=false;}
+  // surd reduction
+  const surds={"\\sqrt{-12}":"2\\sqrt{3}\\imaginaryI","\\sqrt{-4}":"2\\imaginaryI","\\sqrt{-2}":"\\sqrt{2}\\imaginaryI","\\sqrt{12}":"2\\sqrt{3}","\\sqrt{-1}":"\\imaginaryI"};
+  for(const[k,v]of Object.entries(surds)){if(reduceRadicals(k)!==v){console.error("FAIL surd",k,"->",reduceRadicals(k),"exp",v);ok=false;}}
   console.log(ok?"calc self-test: PASS":"calc self-test: FAIL");
 })();
 </script>
