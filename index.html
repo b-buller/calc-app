@@ -342,16 +342,31 @@ function evaluate(){
     const im=typeof dec.im==="number"?dec.im:0;
     const bad=dec.isNaN||(!isFinite(re)&&!(im&&isFinite(im)))||(im&&!isFinite(im));
     if(bad){out.setValue("\\text{Math ERROR}");return;}
-    S.lastExact=ex.latex;S.lastDec=dec.latex;
-    S.lastNum=(im===0)?re:NaN;           // ENG only for real results
-    S.ansLatex=dec.latex;
+    if(im!==0){
+      // CE's exact complex surds don't reduce (e.g. sqrt(-12)); show numeric a+bi
+      const disp=cplxLatex(re,im);
+      S.lastExact=disp;S.lastDec=disp;S.lastNum=NaN;S.ansLatex=disp;
+    }else{
+      S.lastExact=ex.latex;S.lastDec=fmtNum(re);S.lastNum=re;S.ansLatex=ex.latex;
+    }
     showResult();
-    pushHistory(latex,dec.latex);
+    pushHistory(latex,S.sd==="exact"?S.lastExact:S.lastDec);
   }catch(err){
     out.setValue("\\text{Syntax ERROR}");
   }
 }
 function numOf(v){try{return typeof v.re==="number"?v.re:Number(v.valueOf());}catch(e){return NaN;}}
+/* round to 10 significant figures (Casio-style) */
+function round10(x){return parseFloat(x.toPrecision(10));}
+function fmtNum(x){return String(round10(x));}
+/* a+bi as LaTeX, reduced (drop 1 coefficients, sign handling) */
+function cplxLatex(re,im){
+  re=round10(re);im=round10(im);
+  const mag=Math.abs(im), imag=(mag===1?"":String(mag))+"\\imaginaryI";
+  if(im===0)return String(re);
+  if(re===0)return (im<0?"-":"")+imag;
+  return String(re)+(im<0?"-":"+")+imag;
+}
 /* engineering notation: mantissa × 10^(3k) */
 function engResult(){
   const x=S.lastNum;
