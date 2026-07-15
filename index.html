@@ -172,8 +172,15 @@ MathfieldElement.soundsDirectory = null;
 const ce = new ComputeEngine();
 MathfieldElement.computeEngine = ce;
 
+/* nPr as a native CE function so \operatorname{nPr}(n,r) evaluates */
+ce.declare("nPr",{signature:"(number,number)->number",evaluate:(args)=>{
+  const n=args[0].re, r=args[1].re;
+  if(!isFinite(n)||!isFinite(r)||r<0||r>n) return ce.NaN;
+  let p=1;for(let i=0;i<r;i++)p*=(n-i);return ce.number(p);
+}});
+
 /* ---------- state ---------- */
-const S={shift:false,alpha:false,mode:"DEG",ansLatex:"",mem:0,sd:"exact",lastExact:null,lastDec:null,hist:[]};
+const S={shift:false,alpha:false,mode:"DEG",ansLatex:"",mem:0,sd:"exact",lastExact:null,lastDec:null,lastNum:NaN,hist:[]};
 const HKEY="calc-history";
 const MODES=["DEG","RAD","GRAD"];
 const ANG={DEG:"deg",RAD:"rad",GRAD:"grad"};
@@ -223,7 +230,7 @@ const KEYS=[
   K("ln","ln","fn","ins","\\ln(#0)","eˣ","e^{#?}"),
   K("lp","(","fn","ins","(","%","\\%"),
   K("rp",")","fn","ins",")",",",","),
-  K("neg","(−)","fn","ins","-"),
+  K("neg","(−)","fn","ins","-","Abs","\\left|#0\\right|"),
 
   K("sin","sin","fn","ins","\\sin(#0)","sin⁻¹","\\arcsin(#0)",null),
   K("cos","cos","fn","ins","\\cos(#0)","cos⁻¹","\\arccos(#0)",null),
@@ -234,7 +241,7 @@ const KEYS=[
   K("rcl","RCL","fn","act",null,"STO"),
   K("eng","ENG","fn","act"),
   K("pi","π","fn","ins","\\pi"),
-  K("euler","e","fn","ins","e"),
+  K("euler","e","fn","ins","e","i","\\imaginaryI"),
   K("mplus","M+","fn","act",null,"M−"),
 
   // number block
@@ -248,7 +255,7 @@ const KEYS=[
   K("5","5","num","ins","5"),
   K("6","6","num","ins","6"),
   K("mul","×","op","ins","\\times","nCr","\\binom{#0}{#0}"),
-  K("div","÷","op","ins","\\div","nPr",null),
+  K("div","÷","op","ins","\\div","nPr","\\operatorname{nPr}(#0,#0)"),
 
   K("1","1","num","ins","1"),
   K("2","2","num","ins","2"),
@@ -291,8 +298,12 @@ function press(d){
   if(d.k==="alpha"){S.alpha=!S.alpha;S.shift=false;flags();return;}
 
   if(d.t==="ins"){
-    const latex=(shifted&&d.shval)?d.shval:d.val;
-    if(latex!=null)mf.insert(latex,{selectionMode:"placeholder",focus:true});
+    if(shifted&&d.k==="dot"){                        // Ran#
+      mf.insert(String(Math.floor(Math.random()*1000)/1000),{focus:true});
+    }else{
+      const latex=(shifted&&d.shval)?d.shval:d.val;
+      if(latex!=null)mf.insert(latex,{selectionMode:"placeholder",focus:true});
+    }
   }else if(d.t==="cmd"){
     mf.executeCommand(d.val);
   }else if(d.t==="act"){
@@ -312,7 +323,8 @@ function action(k,shifted){
     case"ans":if(S.ansLatex)mf.insert(S.ansLatex,{focus:true});break;
     case"mplus":memAdd(shifted?-1:1);break;
     case"rcl":if(shifted){/* STO stub */}else if(S.mem)mf.insert(String(S.mem),{focus:true});break;
-    // stubs (wired later): calc, intg, hyp, dms, eng
+    case"eng":engResult();break;
+    // stubs (future): calc, intg, hyp, dms
     default:break;
   }
 }
@@ -326,8 +338,12 @@ function evaluate(){
     const expr=ce.parse(latex);
     const dec=expr.N();
     const ex=expr.evaluate();
-    if(dec.isNaN||!isFinite(numOf(dec))){out.setValue("\\text{Math ERROR}");return;}
+    const re=typeof dec.re==="number"?dec.re:NaN;
+    const im=typeof dec.im==="number"?dec.im:0;
+    const bad=dec.isNaN||(!isFinite(re)&&!(im&&isFinite(im)))||(im&&!isFinite(im));
+    if(bad){out.setValue("\\text{Math ERROR}");return;}
     S.lastExact=ex.latex;S.lastDec=dec.latex;
+    S.lastNum=(im===0)?re:NaN;           // ENG only for real results
     S.ansLatex=dec.latex;
     showResult();
     pushHistory(latex,dec.latex);
@@ -336,6 +352,18 @@ function evaluate(){
   }
 }
 function numOf(v){try{return typeof v.re==="number"?v.re:Number(v.valueOf());}catch(e){return NaN;}}
+/* engineering notation: mantissa × 10^(3k) */
+function engResult(){
+  const x=S.lastNum;
+  if(!isFinite(x)){return;}
+  if(x===0){out.setValue("0");return;}
+  let exp=Math.floor(Math.log10(Math.abs(x)));
+  exp=exp-((exp%3)+3)%3;
+  const mant=x/Math.pow(10,exp);
+  const m=parseFloat(mant.toPrecision(10)).toString();
+  out.setValue(exp===0?m:`${m}\\times10^{${exp}}`);
+  S.sd="decimal";
+}
 function showResult(){
   const v=S.sd==="exact"?S.lastExact:S.lastDec;
   if(v!=null)out.setValue(v);
@@ -395,11 +423,15 @@ flags();
   const near=(a,b)=>Math.abs(a-b)<1e-9;
   let ok=true;
   ce.angularUnit="deg";
-  const cases=[["\\frac{1}{2}+\\frac{1}{3}",5/6],["\\sqrt{9}",3],["2^{10}",1024],["\\sin(30)",0.5],["\\binom{5}{2}",10]];
+  const cases=[["\\frac{1}{2}+\\frac{1}{3}",5/6],["\\sqrt{9}",3],["2^{10}",1024],["\\sin(30)",0.5],
+    ["\\binom{5}{2}",10],["\\operatorname{nPr}(5,2)",20],["\\left|3+4i\\right|",5],["50\\%",0.5]];
   for(const[tex,exp]of cases){
     try{const v=numOf(ce.parse(tex).N());if(!near(v,exp)){console.error("FAIL",tex,v,"!=",exp);ok=false;}}
     catch(err){console.error("ERR",tex,err.message);ok=false;}
   }
+  // complex: (2+3i)(1-i) = 5+i
+  try{const z=ce.parse("(2+3i)(1-i)").N();if(!near(z.re,5)||!near(z.im,1)){console.error("FAIL complex",z.latex);ok=false;}}
+  catch(err){console.error("ERR complex",err.message);ok=false;}
   console.log(ok?"calc self-test: PASS":"calc self-test: FAIL");
 })();
 </script>
