@@ -80,6 +80,7 @@
   }
   button.key{
     position:relative;height:100%;min-height:34px;
+    touch-action:none;
     border:1px solid var(--grey-edge);
     background:linear-gradient(180deg,var(--grey),var(--grey2));
     color:var(--func);border-radius:8px;padding:0;
@@ -281,13 +282,18 @@ const KMAP=Object.fromEntries(KEYS.map(d=>[d.k,d]));
 
 function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 
-/* keep caret in field when tapping keypad */
-pad.addEventListener("pointerdown",e=>{if(e.target.closest("button.key"))e.preventDefault();});
-
-pad.addEventListener("click",e=>{
+/* Act on pointerdown (fires instantly, once per tap) so rapid taps like 6-then-8
+   aren't merged/dropped as double-tap gestures the way delayed click events are.
+   preventDefault keeps focus in the math-field and suppresses the synthetic click. */
+pad.addEventListener("pointerdown",e=>{
   const btn=e.target.closest("button.key");if(!btn)return;
+  e.preventDefault();
   press(KMAP[btn.dataset.k]);
   if(navigator.vibrate)navigator.vibrate(6);
+});
+/* keyboard/accessibility: still handle click for non-pointer activation */
+pad.addEventListener("click",e=>{
+  if(e.detail===0){const btn=e.target.closest("button.key");if(btn)press(KMAP[btn.dataset.k]);}
 });
 
 function press(d){
