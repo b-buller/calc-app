@@ -78,27 +78,20 @@
   .pad6{grid-template-columns:repeat(6,1fr);flex:5 1 0}
   .pad5{grid-template-columns:repeat(5,1fr);flex:4 1 0}
 
-  /* round REPLAY disc (replaces 4 arrow keys) */
-  .disc{
-    position:relative;justify-self:center;align-self:center;
-    height:100%;aspect-ratio:1;max-width:100%;
-    border-radius:50%;overflow:hidden;
-    background:radial-gradient(circle at 50% 38%,#6d747e,#3c414a 72%);
+  /* rectangular nav rocker (replaces round REPLAY disc): full-width 4-way strip */
+  .navpad{
+    height:100%;width:100%;
+    display:grid;grid-template-columns:repeat(4,1fr);
+    border-radius:8px;overflow:hidden;
     border:1px solid #2b2f36;
-    box-shadow:0 2px 4px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.18);
-    display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
+    background:linear-gradient(180deg,#6d747e,#3c414a);
+    box-shadow:0 2px 0 rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.18);
     touch-action:none;
   }
-  .disc-btn{background:transparent;border:none;color:#eef1f4;font-size:9px;line-height:1;
+  .nav-btn{background:transparent;border:none;color:#eef1f4;font-size:clamp(16px,3vh,24px);line-height:1;
     cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;touch-action:none}
-  .disc-btn:active{background:rgba(255,255,255,.18)}
-  .disc-btn.up{grid-area:1/2}
-  .disc-btn.left{grid-area:2/1}
-  .disc-btn.right{grid-area:2/3}
-  .disc-btn.down{grid-area:3/2}
-  .disc-center{grid-area:2/2;border-radius:50%;margin:16%;
-    background:radial-gradient(circle at 50% 38%,#828994,#4b5058);
-    box-shadow:inset 0 1px 2px rgba(0,0,0,.5),0 1px 0 rgba(255,255,255,.12)}
+  .nav-btn+.nav-btn{border-left:1px solid rgba(0,0,0,.35)}
+  .nav-btn:active{background:rgba(255,255,255,.18)}
 
   button.key{
     position:relative;height:100%;min-height:34px;
@@ -106,24 +99,26 @@
     border:1px solid var(--grey-edge);
     background:linear-gradient(180deg,var(--grey),var(--grey2));
     color:var(--func);border-radius:8px;padding:0;
-    font-size:clamp(12px,1.9vh,17px);font-weight:600;cursor:pointer;
+    font-size:clamp(20px,3.8vh,30px);font-weight:600;cursor:pointer;
     display:flex;flex-direction:column;align-items:center;justify-content:center;
     box-shadow:0 2px 0 rgba(40,44,50,.45),inset 0 1px 0 rgba(255,255,255,.25);
     user-select:none;transition:transform .04s,filter .04s;line-height:1.05;
   }
   button.key:active{transform:translateY(1px);filter:brightness(1.32);box-shadow:0 0 0 rgba(0,0,0,.4)}
-  button.key .sh{position:absolute;top:3px;left:4px;font-size:8px;color:var(--shift);font-weight:700;white-space:nowrap;transform:translate(0,0);
+  button.key .sh{position:absolute;top:3px;left:4px;font-size:11px;color:var(--shift);font-weight:700;white-space:nowrap;transform:translate(0,0);
     transition:top .16s ease,left .16s ease,transform .16s ease,font-size .16s ease}
-  button.key .al{position:absolute;top:2px;right:3px;font-size:8px;color:var(--alpha);font-weight:700}
+  button.key .al{position:absolute;top:2px;right:3px;font-size:11px;color:var(--alpha);font-weight:700}
   button.key .main{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:inherit;pointer-events:none;white-space:nowrap;
     transition:top .16s ease,left .16s ease,transform .16s ease,font-size .16s ease}
-  button.key.fn .main{font-size:clamp(11px,1.75vh,15px)}
+  button.key.fn .main{font-size:clamp(17px,3.4vh,26px)}
   button.key.num,button.key.op,button.key.eq{
     background:linear-gradient(180deg,var(--blk),var(--blk2));border-color:var(--blk-edge);
     box-shadow:0 2px 0 rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.12);
   }
-  button.key.num .main,button.key.op .main{color:#fff;font-size:clamp(16px,2.5vh,22px)}
-  button.key.eq .main{color:#fff;font-size:clamp(18px,2.8vh,24px)}
+  button.key.num .main,button.key.op .main{color:#fff;font-size:clamp(26px,4.8vh,40px)}
+  button.key.eq .main{color:#fff;font-size:clamp(28px,5.4vh,44px)}
+  /* word labels (SHIFT, CALC, ×10ˣ…) need less than the symbol keys or they overflow */
+  button.key.txt .main{font-size:clamp(14px,2.6vh,20px)}
   button.key.danger{
     background:linear-gradient(180deg,var(--red),var(--red2));border-color:var(--red-edge);
     box-shadow:0 2px 0 rgba(60,20,34,.5),inset 0 1px 0 rgba(255,255,255,.18);
@@ -133,18 +128,18 @@
   button.key.shiftkey .main{color:var(--shift)}
   button.key.alphakey{background:linear-gradient(180deg,#e0e3e7,#c4cad0);border-color:#aeb5bd}
   button.key.alphakey .main{color:var(--alpha)}
-  button.key.nav .main{font-size:16px}
+  button.key.nav .main{font-size:26px}
   body.shift-on button.key.shiftkey{box-shadow:0 0 0 2px var(--shift),0 2px 0 rgba(40,44,50,.45)}
   body.alpha-on button.key.alphakey{box-shadow:0 0 0 2px var(--alpha),0 2px 0 rgba(40,44,50,.45)}
   /* SHIFT held: labels animate-swap — yellow shift label slides to center & grows,
      white primary slides to upper-left & shrinks. Colors unchanged, only size/position. */
   body.shift-on button.key.hassh .main{
     top:3px;left:4px;transform:translate(0,0);
-    font-size:8px;line-height:1;
+    font-size:11px;line-height:1;
   }
   body.shift-on button.key.hassh .sh{
     top:50%;left:50%;transform:translate(-50%,-50%);
-    font-size:clamp(11px,1.75vh,15px);
+    font-size:clamp(17px,3.4vh,26px);
   }
   sup{font-size:.7em;vertical-align:super}
 
@@ -165,7 +160,7 @@
   .hist-item .he{font-size:15px;color:#5a626c}
   .hist-item .hr{font-size:20px;color:#1b1f25;font-weight:700}
   .hist-empty{color:#8a929c;text-align:center;margin-top:30px;font-size:14px}
-  @media (max-width:340px){button.key{font-size:12px}}
+  @media (max-width:340px){button.key{font-size:18px}}
 </style>
 </head>
 <body>
@@ -218,7 +213,8 @@ ce.declare("nPr",{signature:"(number,number)->number",evaluate:(args)=>{
 }});
 
 /* ---------- state ---------- */
-const S={shift:false,alpha:false,mode:"DEG",ansLatex:"",mem:0,sd:"exact",lastExact:null,lastDec:null,lastNum:NaN,hist:[]};
+const S={shift:false,alpha:false,mode:"DEG",mem:0,sd:"exact",lastExact:null,lastDec:null,lastNum:NaN,hist:[]};
+ce.assign("Ans",0);   // Ans is a live symbol; updated after each evaluation
 const HKEY="calc-history";
 const MODES=["DEG","RAD","GRAD"];
 const ANG={DEG:"deg",RAD:"rad",GRAD:"grad"};
@@ -246,23 +242,23 @@ setTimeout(()=>mf.focus(),0);
 const K=(k,main,cls,t,val,sh,shval,al)=>({k,main,cls,t,val,sh,shval,al});
 const KEYS=[
   // function block
-  K("shift","SHIFT","shiftkey","act"),
-  K("alpha","ALPHA","alphakey","act"),
-  K("mode","MODE","fn","act"),
-  K("calc","CALC","fn","act",null,"SOLVE"),
+  K("shift","SHIFT","shiftkey txt","act"),
+  K("alpha","ALPHA","alphakey txt","act"),
+  K("mode","MODE","fn txt","act"),
+  K("calc","CALC","fn txt","act",null,"SOLVE"),
   K("intg","∫dx","fn","act",null,"d/dx"),
 
   K("left","◀","fn nav","cmd","moveToPreviousChar"),
   K("up","▲","fn nav","cmd","moveUp"),
   K("down","▼","fn nav","cmd","moveDown"),
   K("right","▶","fn nav","cmd","moveToNextChar"),
-  K("sd","S⇔D","fn","act"),
+  K("sd","S⇔D","fn txt","act"),
 
   K("inv","x⁻¹","fn","ins","^{-1}"),
   K("frac","▯/▯","fn","ins","\\frac{#0}{#0}","▯⌐","\\frac{#0}{#0}"),
   K("sqrt","√▯","fn","ins","\\sqrt{#0}","∛","\\sqrt[3]{#0}"),
   K("sq","x²","fn","ins","^{2}","x³","^{3}"),
-  K("pow","x▯","fn","ins","^{#?}","ˣ√","\\sqrt[#?]{#?}"),
+  K("pow","x<sup>▯</sup>","fn","ins","^{#?}","ˣ√","\\sqrt[#?]{#?}"),
 
   K("log","log","fn","ins","\\log(#0)","10ˣ","10^{#?}"),
   K("ln","ln","fn","ins","\\ln(#0)","eˣ","e^{#?}"),
@@ -276,13 +272,13 @@ const KEYS=[
   K("hyp","hyp","fn","act"),
   K("dms","°′″","fn","act",null,"DRG"),
 
-  K("rcl","RCL","fn","act",null,"STO"),
-  K("eng","ENG","fn","act",null,"i"),           // SHIFT+ENG inserts i
+  K("rcl","RCL","fn txt","act",null,"STO"),
+  K("eng","ENG","fn txt","act",null,"i"),       // SHIFT+ENG inserts i
   K("pi","π","fn","ins","\\pi"),
   K("euler","e","fn","ins","e"),
   K("fact","x!","fn","ins","!"),
-  K("mplus","M+","fn","act",null,"M−"),
-  K("on","ON","fn","act"),
+  K("mplus","M+","fn txt","act",null,"M−"),
+  K("on","ON","fn txt","act"),
 
   // number block
   K("7","7","num","ins","7"),
@@ -305,7 +301,7 @@ const KEYS=[
 
   K("0","0","num","ins","0"),
   K("dot",".","num","ins",".","Ran#",null),
-  K("exp","×10ˣ","num","ins","\\times10^{#?}"),
+  K("exp","×10ˣ","num txt","ins","\\times10^{#?}"),
   K("ans","Ans","num","act"),
   K("eq","=","eq","act"),
 ];
@@ -331,14 +327,14 @@ const GRID5=[
 function keyHTML(d){
   const sh=d.sh?`<span class="sh">${esc(d.sh)}</span>`:"";
   const al=d.al?`<span class="al">${esc(d.al)}</span>`:"";
-  return `<button class="key ${d.cls}${d.sh?" hassh":""}" data-k="${d.k}">${sh}${al}<span class="main">${esc(d.main)}</span></button>`;
+  // main labels are internal constants; may contain markup like <sup>
+  return `<button class="key ${d.cls}${d.sh?" hassh":""}" data-k="${d.k}">${sh}${al}<span class="main">${d.main}</span></button>`;
 }
-const DISC=`<div class="disc" style="grid-column:span 2">
-  <button class="disc-btn up" data-k="up" aria-label="Up">&#9650;</button>
-  <button class="disc-btn left" data-k="left" aria-label="Left">&#9664;</button>
-  <span class="disc-center"></span>
-  <button class="disc-btn right" data-k="right" aria-label="Right">&#9654;</button>
-  <button class="disc-btn down" data-k="down" aria-label="Down">&#9660;</button>
+const DISC=`<div class="navpad" style="grid-column:span 2">
+  <button class="nav-btn" data-k="left" aria-label="Left">&#9664;</button>
+  <button class="nav-btn" data-k="up" aria-label="Up">&#9650;</button>
+  <button class="nav-btn" data-k="down" aria-label="Down">&#9660;</button>
+  <button class="nav-btn" data-k="right" aria-label="Right">&#9654;</button>
 </div>`;
 document.getElementById("pad6").innerHTML=GRID6.map(k=>k==="DISC"?DISC:keyHTML(KMAP[k])).join("");
 document.getElementById("pad5").innerHTML=GRID5.map(k=>keyHTML(KMAP[k])).join("");
@@ -388,7 +384,7 @@ function action(k,shifted){
     case"del":mf.executeCommand("deleteBackward");break;
     case"ac":mf.setValue("");out.setValue("");S.lastExact=S.lastDec=null;break;
     case"eq":evaluate();break;
-    case"ans":if(S.ansLatex)mf.insert(S.ansLatex,{focus:true});break;
+    case"ans":mf.insert("\\mathrm{Ans}",{focus:true});break;
     case"mplus":memAdd(shifted?-1:1);break;
     case"rcl":if(shifted){/* STO stub */}else if(S.mem)mf.insert(String(S.mem),{focus:true});break;
     case"eng":shifted?mf.insert("\\imaginaryI",{focus:true}):engResult();break;   // SHIFT+ENG = i
@@ -411,13 +407,14 @@ function evaluate(){
     const im=typeof dec.im==="number"?dec.im:0;
     const bad=dec.isNaN||(!isFinite(re)&&!(im&&isFinite(im)))||(im&&!isFinite(im));
     if(bad){out.setValue("\\text{Math ERROR}");return;}
+    ce.assign("Ans",ex);
     if(im!==0){
       // exact: reduce CE's raw radicals (sqrt(-12) -> 2√3 i); decimal: a+bi
       S.lastExact=reduceRadicals(ex.latex);
       S.lastDec=cplxLatex(re,im);
-      S.lastNum=NaN;S.ansLatex=S.lastExact;
+      S.lastNum=NaN;
     }else{
-      S.lastExact=reduceRadicals(ex.latex);S.lastDec=fmtNum(re);S.lastNum=re;S.ansLatex=ex.latex;
+      S.lastExact=reduceRadicals(ex.latex);S.lastDec=fmtNum(re);S.lastNum=re;
     }
     S.sd="exact";           // each new result shows exact by default (S⇔D toggles it)
     showResult();
@@ -527,6 +524,9 @@ flags();
     try{const v=numOf(ce.parse(tex).N());if(!near(v,exp)){console.error("FAIL",tex,v,"!=",exp);ok=false;}}
     catch(err){console.error("ERR",tex,err.message);ok=false;}
   }
+  // Ans as live symbol
+  try{ce.assign("Ans",7);const v=numOf(ce.parse("\\mathrm{Ans}+1").N());if(!near(v,8)){console.error("FAIL Ans",v);ok=false;}ce.assign("Ans",0);}
+  catch(err){console.error("ERR Ans",err.message);ok=false;}
   // complex: (2+3i)(1-i) = 5+i
   try{const z=ce.parse("(2+3i)(1-i)").N();if(!near(z.re,5)||!near(z.im,1)){console.error("FAIL complex",z.latex);ok=false;}}
   catch(err){console.error("ERR complex",err.message);ok=false;}

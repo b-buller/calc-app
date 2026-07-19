@@ -10,10 +10,10 @@ This tracks what is NOT built yet. Buttons for many of these exist but are stubb
 - Quick wins: nPr, nCr, Abs, Ran#, ENG (engineering notation), %.
 - Imaginary/complex numbers: `i` (SHIFT+e), arithmetic, i², √−1, |a+bi|. Results show `a+bi`.
 - History (localStorage), light Casio theme, offline PWA.
+- Ans as a live symbol (`\mathrm{Ans}` bound in Compute Engine, updated each evaluation).
 
 ## Medium (state/UI, engine already capable)
 - **STO / RCL variables** A–F, X, Y, M via `ce.assign(name, value)`; wire M+/M− fully.
-- **Ans as a live symbol** — currently inserts the decimal value, not a dynamic reference.
 - **CALC** — evaluate a stored expression, prompting for each variable it contains.
 - **SOLVE** — numeric root find (`ce.solve` / Newton). Needs a variable picker + initial guess UI.
 - **Error caret positioning** — on Syntax/Math ERROR, jump the cursor to the offending token (real ES behavior).
