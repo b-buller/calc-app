@@ -11,6 +11,8 @@ This tracks what is NOT built yet. Buttons for many of these exist but are stubb
 - Imaginary/complex numbers: `i` (SHIFT+e), arithmetic, i², √−1, |a+bi|. Results show `a+bi`.
 - History (localStorage), light Casio theme, offline PWA.
 - Ans as a live symbol (`\mathrm{Ans}` bound in Compute Engine, updated each evaluation).
+- **GRAPH** — full-screen y=f(x) plotter (∿ button on LCD). Canvas render, pan/pinch/wheel zoom,
+  auto y-fit, asymptote-aware, respects DEG/RAD/GRAD. ALPHA+`)` types X.
 
 ## Medium (state/UI, engine already capable)
 - **STO / RCL variables** A–F, X, Y, M via `ce.assign(name, value)`; wire M+/M− fully.

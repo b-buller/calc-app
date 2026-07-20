@@ -55,7 +55,8 @@
   .flags{display:flex;align-items:center;gap:9px;font-size:11px;font-weight:700;min-height:15px;letter-spacing:.5px;font-family:"Courier New",monospace}
   .flags span{visibility:hidden}
   .flags span.on{visibility:visible}
-  .histbtn{margin-left:auto;visibility:visible;background:none;border:none;color:var(--lcd-ink);font-size:16px;line-height:1;cursor:pointer;padding:0 2px;opacity:.85}
+  .histbtn{visibility:visible;background:none;border:none;color:var(--lcd-ink);font-size:16px;line-height:1;cursor:pointer;padding:0 2px;opacity:.85}
+  #graphBtn{margin-left:auto}
   #mf{
     flex:1 1 auto;width:100%;min-height:2.2em;
     border:none;background:transparent;color:var(--lcd-ink);
@@ -160,6 +161,23 @@
   .hist-item .he{font-size:15px;color:#5a626c}
   .hist-item .hr{font-size:20px;color:#1b1f25;font-weight:700}
   .hist-empty{color:#8a929c;text-align:center;margin-top:30px;font-size:14px}
+
+  /* graph overlay */
+  .graph{position:absolute;inset:0;background:#eef0f2;display:flex;flex-direction:column;z-index:20;
+    padding:calc(env(safe-area-inset-top) + 10px) 10px calc(env(safe-area-inset-bottom) + 10px)}
+  .graph[hidden]{display:none}
+  .graph-head{display:flex;align-items:center;gap:6px;padding-bottom:8px}
+  .graph-eq{flex:1;min-width:0;overflow:hidden;display:flex;align-items:center;gap:4px;
+    font-weight:700;color:#2a2f36;font-size:16px}
+  .graph-eq math-field{pointer-events:none;background:transparent;border:none;font-size:17px;
+    --caret-color:transparent;overflow:hidden}
+  .graph-btn{background:linear-gradient(180deg,var(--grey),var(--grey2));border:1px solid var(--grey-edge);
+    color:#fff;border-radius:7px;width:36px;height:32px;font-size:16px;cursor:pointer;flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center}
+  .graph-btn:active{filter:brightness(1.3)}
+  #gCanvas{flex:1;min-height:0;width:100%;border-radius:8px;border:2px solid var(--lcd-edge);
+    background:#f6f8f4;touch-action:none;cursor:grab}
+  .graph-hint{text-align:center;font-size:11px;color:#8a929c;padding-top:6px}
   @media (max-width:340px){button.key{font-size:16px}}
 </style>
 </head>
@@ -171,6 +189,7 @@
         <span id="fAlpha">A</span>
         <span id="fM">M</span>
         <span id="fMode" class="on">DEG</span>
+        <button id="graphBtn" class="histbtn" aria-label="Graph">&#8767;</button>
         <button id="histBtn" class="histbtn" aria-label="History">&#9719;</button>
       </div>
       <div id="mfWrap"></div>
@@ -191,6 +210,18 @@
         </div>
       </div>
       <div class="hist-list" id="histList"></div>
+    </div>
+
+    <div class="graph" id="graph" hidden>
+      <div class="graph-head">
+        <div class="graph-eq"><span>y&nbsp;=</span><math-field read-only id="gEq"></math-field></div>
+        <button class="graph-btn" id="gZoomOut" aria-label="Zoom out">&minus;</button>
+        <button class="graph-btn" id="gZoomIn" aria-label="Zoom in">+</button>
+        <button class="graph-btn" id="gReset" aria-label="Reset view">&#8962;</button>
+        <button class="graph-btn" id="gClose" aria-label="Close">&#10005;</button>
+      </div>
+      <canvas id="gCanvas"></canvas>
+      <div class="graph-hint">drag to pan &middot; pinch or scroll to zoom</div>
     </div>
   </div>
 
@@ -243,7 +274,7 @@ setTimeout(()=>mf.focus(),0);
 
 /* ---------- key definitions (fx-115ES-ish full layout) ---------- */
 // t: 'ins' latex insert | 'cmd' mathfield command | 'act' custom action
-const K=(k,main,cls,t,val,sh,shval,al)=>({k,main,cls,t,val,sh,shval,al});
+const K=(k,main,cls,t,val,sh,shval,al,alval)=>({k,main,cls,t,val,sh,shval,al,alval});
 const KEYS=[
   // function block
   K("shift","SHIFT","shiftkey txt","act"),
@@ -267,7 +298,7 @@ const KEYS=[
   K("log","log","fn","ins","\\log_{10}(#0)","10ˣ","10^{#?}"),  // base 10 prefilled, editable; cursor lands in parens
   K("ln","ln","fn","ins","\\ln(#0)","eˣ","e^{#?}"),
   K("lp","(","fn","ins","(","%","\\%"),
-  K("rp",")","fn","ins",")",",",","),
+  K("rp",")","fn","ins",")",",",",","X","x"),   // ALPHA+) = X, like the real fx-115ES
   K("neg","(−)","fn","ins","-","Abs","\\left|#0\\right|"),
 
   K("sin","sin","fn","ins","\\sin(#0)","sin⁻¹","\\arcsin(#0)",null),
@@ -363,7 +394,7 @@ pads.addEventListener("click",e=>{
 
 function press(d){
   if(!d)return;
-  const shifted=S.shift;
+  const shifted=S.shift,alphaed=S.alpha;
   // modifier toggles
   if(d.k==="shift"){S.shift=!S.shift;S.alpha=false;flags();return;}
   if(d.k==="alpha"){S.alpha=!S.alpha;S.shift=false;flags();return;}
@@ -372,7 +403,7 @@ function press(d){
     if(shifted&&d.k==="dot"){                        // Ran#
       mf.insert(String(Math.floor(Math.random()*1000)/1000),{focus:true});
     }else{
-      const latex=(shifted&&d.shval)?d.shval:d.val;
+      const latex=(shifted&&d.shval)?d.shval:(alphaed&&d.alval)?d.alval:d.val;
       if(latex!=null)mf.insert(latex,{selectionMode:"placeholder",focus:true});
     }
   }else if(d.t==="cmd"){
@@ -508,6 +539,171 @@ histList.addEventListener("click",e=>{
   // history stores \mathrm{Ans} (renders in plain math-fields); restore atomic \Ans for editing
   mf.setValue(h.e.replace(/\\mathrm\{Ans\}/g,"\\Ans"));histEl.hidden=true;mf.focus();
 });
+
+/* ---------- graph ---------- */
+const gEl=document.getElementById("graph"),gCv=document.getElementById("gCanvas"),
+      gEq=document.getElementById("gEq"),gCtx=gCv.getContext("2d");
+const G={f:null,slow:false,x0:-10,x1:10,y0:-10,y1:10,open:false};
+
+/* build y=f(x) evaluator: compiled JS when possible, boxed-eval fallback.
+   compile() is radians-only in some CE builds — probe sin under the current
+   angle mode and fall back to (slower) boxed evaluation if they disagree. */
+function makeFn(latex){
+  ce.angularUnit=ANG[S.mode];
+  const expr=ce.parse(latex);
+  let fn=null;
+  try{fn=expr.compile();}catch(e){}
+  if(fn&&S.mode!=="RAD"&&/\\(arc)?(sin|cos|tan)/.test(latex)){
+    try{
+      const probe=ce.parse("\\sin(30)");
+      if(Math.abs(probe.N().re-probe.compile()({}))>1e-9)fn=null;
+    }catch(e){fn=null;}
+  }
+  G.slow=!fn;
+  if(fn)return x=>{try{const v=fn({x});return typeof v==="number"?v:NaN;}catch(e){return NaN;}};
+  return x=>{try{return numOf(expr.subs({x:ce.number(x)}).N());}catch(e){return NaN;}};
+}
+
+function autoFitY(){
+  const n=240,vals=[];
+  for(let i=0;i<=n;i++){
+    const v=G.f(G.x0+(G.x1-G.x0)*i/n);
+    if(isFinite(v))vals.push(v);
+  }
+  if(!vals.length){G.y0=-10;G.y1=10;return;}
+  vals.sort((a,b)=>a-b);
+  // 5th–95th percentile so one asymptote (tan) doesn't blow up the scale
+  let lo=vals[Math.floor(vals.length*.05)],hi=vals[Math.ceil(vals.length*.95)-1];
+  if(!isFinite(lo)||!isFinite(hi)){G.y0=-10;G.y1=10;return;}
+  if(hi-lo<1e-9){lo-=1;hi+=1;}
+  const pad=(hi-lo)*.15;
+  G.y0=lo-pad;G.y1=hi+pad;
+}
+
+function openGraph(){
+  const latex=ceLatex(mf.getValue("latex"));
+  if(!latex||/\\placeholder/.test(latex)){out.setValue("\\text{Nothing to graph}");return;}
+  try{G.f=makeFn(latex);}catch(e){out.setValue("\\text{Syntax ERROR}");return;}
+  gEq.setValue(latex);
+  G.x0=-10;G.x1=10;autoFitY();
+  gEl.hidden=false;G.open=true;
+  sizeCanvas();drawGraph();
+}
+function closeGraph(){gEl.hidden=true;G.open=false;gPtrs.clear();mf.focus();}
+
+function sizeCanvas(){
+  const r=gCv.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
+  gCv.width=Math.round(r.width*dpr);gCv.height=Math.round(r.height*dpr);
+  gCtx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+/* nice tick step: 1/2/5 × 10^n giving ~one gridline per `px` pixels */
+function niceStep(range,pixels,px=64){
+  const raw=range/Math.max(1,pixels/px),p=Math.pow(10,Math.floor(Math.log10(raw))),r=raw/p;
+  return (r<1.5?1:r<3.5?2:r<7.5?5:10)*p;
+}
+function fmtTick(v,step){
+  if(Math.abs(v)<1e-12)v=0;
+  if(Math.abs(v)>=1e6||(v!==0&&Math.abs(v)<1e-4))return v.toExponential(1);
+  const d=Math.max(0,-Math.floor(Math.log10(step)));
+  return String(parseFloat(v.toFixed(Math.min(10,d+1))));
+}
+
+function drawGraph(){
+  const W=gCv.width/(window.devicePixelRatio||1),H=gCv.height/(window.devicePixelRatio||1);
+  if(W<10||H<10)return;
+  const X=x=>(x-G.x0)/(G.x1-G.x0)*W, Y=y=>H-(y-G.y0)/(G.y1-G.y0)*H;
+  gCtx.clearRect(0,0,W,H);
+  gCtx.fillStyle="#f6f8f4";gCtx.fillRect(0,0,W,H);
+
+  // grid + labels
+  const sx=niceStep(G.x1-G.x0,W),sy=niceStep(G.y1-G.y0,H);
+  gCtx.font="11px -apple-system,sans-serif";gCtx.fillStyle="#7c857a";
+  gCtx.strokeStyle="#d8ddd2";gCtx.lineWidth=1;
+  const axY=Math.min(Math.max(Y(0),12),H-6);   // label row (clamped to view)
+  const axX=Math.min(Math.max(X(0),4),W-34);
+  for(let x=Math.ceil(G.x0/sx)*sx;x<=G.x1;x+=sx){
+    const px=X(x);
+    gCtx.beginPath();gCtx.moveTo(px,0);gCtx.lineTo(px,H);gCtx.stroke();
+    if(Math.abs(x)>1e-12)gCtx.fillText(fmtTick(x,sx),px+2,axY-3);
+  }
+  for(let y=Math.ceil(G.y0/sy)*sy;y<=G.y1;y+=sy){
+    const py=Y(y);
+    gCtx.beginPath();gCtx.moveTo(0,py);gCtx.lineTo(W,py);gCtx.stroke();
+    if(Math.abs(y)>1e-12)gCtx.fillText(fmtTick(y,sy),axX+4,py-3);
+  }
+  // axes
+  gCtx.strokeStyle="#69715f";gCtx.lineWidth=1.5;
+  if(G.y0<0&&G.y1>0){gCtx.beginPath();gCtx.moveTo(0,Y(0));gCtx.lineTo(W,Y(0));gCtx.stroke();}
+  if(G.x0<0&&G.x1>0){gCtx.beginPath();gCtx.moveTo(X(0),0);gCtx.lineTo(X(0),H);gCtx.stroke();}
+
+  // curve
+  if(!G.f)return;
+  const n=G.slow?120:Math.ceil(W);           // ponytail: boxed eval is slow, coarser sampling
+  const jump=(G.y1-G.y0)*4;
+  gCtx.strokeStyle="#8f3b52";gCtx.lineWidth=2;gCtx.lineJoin="round";
+  gCtx.beginPath();
+  let pen=false,prev=NaN;
+  for(let i=0;i<=n;i++){
+    const x=G.x0+(G.x1-G.x0)*i/n,y=G.f(x);
+    if(!isFinite(y)||(pen&&Math.abs(y-prev)>jump)){pen=false;prev=y;continue;}
+    const px=X(x),py=Math.max(-H,Math.min(2*H,Y(y)));
+    pen?gCtx.lineTo(px,py):gCtx.moveTo(px,py);
+    pen=true;prev=y;
+  }
+  gCtx.stroke();
+}
+
+/* zoom keeping data point (cx,cy) fixed on screen */
+function zoomAt(cx,cy,k){
+  G.x0=cx-(cx-G.x0)*k;G.x1=cx+(G.x1-cx)*k;
+  G.y0=cy-(cy-G.y0)*k;G.y1=cy+(G.y1-cy)*k;
+  drawGraph();
+}
+const gDataX=px=>G.x0+px/gCv.getBoundingClientRect().width*(G.x1-G.x0);
+const gDataY=py=>{const h=gCv.getBoundingClientRect().height;return G.y0+(h-py)/h*(G.y1-G.y0);};
+
+/* gestures: 1 pointer = pan, 2 = pinch zoom, wheel = zoom at cursor */
+const gPtrs=new Map();
+gCv.addEventListener("pointerdown",e=>{
+  gCv.setPointerCapture(e.pointerId);
+  gPtrs.set(e.pointerId,{x:e.offsetX,y:e.offsetY});
+});
+gCv.addEventListener("pointermove",e=>{
+  if(!gPtrs.has(e.pointerId))return;
+  const p=gPtrs.get(e.pointerId);
+  if(gPtrs.size===1){
+    const r=gCv.getBoundingClientRect();
+    const dx=(e.offsetX-p.x)/r.width*(G.x1-G.x0),dy=(e.offsetY-p.y)/r.height*(G.y1-G.y0);
+    G.x0-=dx;G.x1-=dx;G.y0+=dy;G.y1+=dy;
+    p.x=e.offsetX;p.y=e.offsetY;
+    drawGraph();
+  }else if(gPtrs.size===2){
+    const pts=[...gPtrs.values()];
+    const d0=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
+    p.x=e.offsetX;p.y=e.offsetY;
+    const d1=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
+    if(d0>0&&d1>0){
+      const mx=(pts[0].x+pts[1].x)/2,my=(pts[0].y+pts[1].y)/2;
+      zoomAt(gDataX(mx),gDataY(my),d0/d1);
+    }
+  }
+});
+const gPtrEnd=e=>gPtrs.delete(e.pointerId);
+gCv.addEventListener("pointerup",gPtrEnd);
+gCv.addEventListener("pointercancel",gPtrEnd);
+gCv.addEventListener("wheel",e=>{
+  e.preventDefault();
+  zoomAt(gDataX(e.offsetX),gDataY(e.offsetY),Math.exp(e.deltaY*0.0015));
+},{passive:false});
+
+document.getElementById("graphBtn").addEventListener("click",openGraph);
+document.getElementById("gClose").addEventListener("click",closeGraph);
+document.getElementById("gZoomIn").addEventListener("click",()=>zoomAt((G.x0+G.x1)/2,(G.y0+G.y1)/2,1/1.5));
+document.getElementById("gZoomOut").addEventListener("click",()=>zoomAt((G.x0+G.x1)/2,(G.y0+G.y1)/2,1.5));
+document.getElementById("gReset").addEventListener("click",()=>{G.x0=-10;G.x1=10;autoFitY();drawGraph();});
+window.addEventListener("resize",()=>{if(G.open){sizeCanvas();drawGraph();}});
+window.addEventListener("keydown",e=>{if(e.key==="Escape"&&G.open)closeGraph();});
 
 /* ---------- physical keyboard passthrough (let MathLive handle) ---------- */
 window.addEventListener("keydown",e=>{
