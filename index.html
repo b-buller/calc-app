@@ -227,10 +227,11 @@ mf.smartMode=false;
 mf.smartFence=true;
 mf.popoverPolicy="off";
 mf.placeholderSymbol="▯";
-/* Ans is an atomic macro: cursor can't enter it, serializes as \Ans.
-   captureSelection makes it behave as a single solid token. */
-mf.macros={...mf.macros,Ans:{def:"\\mathrm{Ans}",captureSelection:true}};
 document.getElementById("mfWrap").appendChild(mf);
+/* Ans is an atomic macro: cursor can't enter it, serializes as \Ans.
+   captureSelection makes it behave as a single solid token.
+   MUST run after append — the macros getter throws pre-mount. */
+mf.macros={...mf.macros,Ans:{def:"\\mathrm{Ans}",captureSelection:true}};
 
 const out=new MathfieldElement();
 out.id="out";

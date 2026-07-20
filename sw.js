@@ -1,4 +1,4 @@
-const CACHE = "calc-v4"; // bump on every deploy or cached shell never updates
+const CACHE = "calc-v5"; // bump on every deploy or cached shell never updates
 // shell + module entrypoints; fonts/chunks get cached on first load by the fetch handler
 const SHELL = [
   "./", "index.html", "manifest.webmanifest", "icon.svg",
