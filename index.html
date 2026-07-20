@@ -264,7 +264,7 @@ const KEYS=[
   K("sq","x²","fn","ins","^{2}","x³","^{3}"),
   K("pow","x<sup>▯</sup>","fn","ins","^{#?}","ˣ√","\\sqrt[#?]{#?}"),
 
-  K("log","log","fn","ins","\\log(#0)","10ˣ","10^{#?}"),
+  K("log","log","fn","ins","\\log_{10}(#0)","10ˣ","10^{#?}"),  // base 10 prefilled, editable; cursor lands in parens
   K("ln","ln","fn","ins","\\ln(#0)","eˣ","e^{#?}"),
   K("lp","(","fn","ins","(","%","\\%"),
   K("rp",")","fn","ins",")",",",","),
@@ -315,12 +315,15 @@ const KMAP=Object.fromEntries(KEYS.map(d=>[d.k,d]));
 function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 
 // fx-115ES layout. 6-col scientific area (round REPLAY disc spans 2 cols), 5-col number pad.
+// Mirrors the fx-115ES PLUS function block. DISC moved to the top row (real device
+// spans REPLAY over rows 1-2 middle); its freed slots hold π/e/x! which the real
+// device puts on SHIFT/ALPHA. Rows below match the hardware left-to-right:
 const GRID6=[
-  "shift","alpha","DISC","mode","on",           // DISC spans 2 -> 6 cols
-  "inv","frac","sqrt","sq","pow","calc",         // CALC top-right
-  "log","ln","intg","hyp","dms","neg",
-  "sin","cos","tan","pi","euler","fact",
-  "rcl","eng","lp","rp","sd","mplus",            // parentheses centered
+  "shift","alpha","DISC","mode","on",            // DISC spans 2 -> 6 cols
+  "calc","intg","pi","euler","inv","fact",       // real row: CALC ∫dx [replay] x⁻¹ (x! = shift x⁻¹)
+  "frac","sqrt","sq","pow","log","ln",           // real row: ▢/▢ √ x² x^ log ln
+  "neg","dms","hyp","sin","cos","tan",           // real row: (−) °′″ hyp sin cos tan
+  "rcl","eng","lp","rp","sd","mplus",            // real row: RCL ENG ( ) S⇔D M+
 ];
 const GRID5=[
   "7","8","9","del","ac",
@@ -526,7 +529,8 @@ flags();
   let ok=true;
   ce.angularUnit="deg";
   const cases=[["\\frac{1}{2}+\\frac{1}{3}",5/6],["\\sqrt{9}",3],["2^{10}",1024],["\\sin(30)",0.5],
-    ["\\binom{5}{2}",10],["\\operatorname{nPr}(5,2)",20],["\\left|3+4i\\right|",5],["50\\%",0.5]];
+    ["\\binom{5}{2}",10],["\\operatorname{nPr}(5,2)",20],["\\left|3+4i\\right|",5],["50\\%",0.5],
+    ["\\log_{10}(1000)",3],["\\log_{2}(8)",3]];
   for(const[tex,exp]of cases){
     try{const v=numOf(ce.parse(tex).N());if(!near(v,exp)){console.error("FAIL",tex,v,"!=",exp);ok=false;}}
     catch(err){console.error("ERR",tex,err.message);ok=false;}
