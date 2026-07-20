@@ -88,7 +88,7 @@
     box-shadow:0 2px 0 rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.18);
     touch-action:none;
   }
-  .nav-btn{background:transparent;border:none;color:#eef1f4;font-size:clamp(16px,3vh,24px);line-height:1;
+  .nav-btn{background:transparent;border:none;color:#eef1f4;font-size:clamp(14px,2.6vh,20px);line-height:1;
     cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;touch-action:none}
   .nav-btn+.nav-btn{border-left:1px solid rgba(0,0,0,.35)}
   .nav-btn:active{background:rgba(255,255,255,.18)}
@@ -99,26 +99,26 @@
     border:1px solid var(--grey-edge);
     background:linear-gradient(180deg,var(--grey),var(--grey2));
     color:var(--func);border-radius:8px;padding:0;
-    font-size:clamp(20px,3.8vh,30px);font-weight:600;cursor:pointer;
+    font-size:clamp(17px,3vh,25px);font-weight:600;cursor:pointer;
     display:flex;flex-direction:column;align-items:center;justify-content:center;
     box-shadow:0 2px 0 rgba(40,44,50,.45),inset 0 1px 0 rgba(255,255,255,.25);
     user-select:none;transition:transform .04s,filter .04s;line-height:1.05;
   }
   button.key:active{transform:translateY(1px);filter:brightness(1.32);box-shadow:0 0 0 rgba(0,0,0,.4)}
-  button.key .sh{position:absolute;top:3px;left:4px;font-size:11px;color:var(--shift);font-weight:700;white-space:nowrap;transform:translate(0,0);
+  button.key .sh{position:absolute;top:3px;left:4px;font-size:10px;color:var(--shift);font-weight:700;white-space:nowrap;transform:translate(0,0);
     transition:top .16s ease,left .16s ease,transform .16s ease,font-size .16s ease}
-  button.key .al{position:absolute;top:2px;right:3px;font-size:11px;color:var(--alpha);font-weight:700}
+  button.key .al{position:absolute;top:2px;right:3px;font-size:10px;color:var(--alpha);font-weight:700}
   button.key .main{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:inherit;pointer-events:none;white-space:nowrap;
     transition:top .16s ease,left .16s ease,transform .16s ease,font-size .16s ease}
-  button.key.fn .main{font-size:clamp(17px,3.4vh,26px)}
+  button.key.fn .main{font-size:clamp(15px,2.7vh,22px)}
   button.key.num,button.key.op,button.key.eq{
     background:linear-gradient(180deg,var(--blk),var(--blk2));border-color:var(--blk-edge);
     box-shadow:0 2px 0 rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.12);
   }
-  button.key.num .main,button.key.op .main{color:#fff;font-size:clamp(26px,4.8vh,40px)}
-  button.key.eq .main{color:#fff;font-size:clamp(28px,5.4vh,44px)}
+  button.key.num .main,button.key.op .main{color:#fff;font-size:clamp(22px,3.9vh,33px)}
+  button.key.eq .main{color:#fff;font-size:clamp(24px,4.4vh,36px)}
   /* word labels (SHIFT, CALC, ×10ˣ…) need less than the symbol keys or they overflow */
-  button.key.txt .main{font-size:clamp(14px,2.6vh,20px)}
+  button.key.txt .main{font-size:clamp(13px,2.4vh,18px)}
   button.key.danger{
     background:linear-gradient(180deg,var(--red),var(--red2));border-color:var(--red-edge);
     box-shadow:0 2px 0 rgba(60,20,34,.5),inset 0 1px 0 rgba(255,255,255,.18);
@@ -128,18 +128,18 @@
   button.key.shiftkey .main{color:var(--shift)}
   button.key.alphakey{background:linear-gradient(180deg,#e0e3e7,#c4cad0);border-color:#aeb5bd}
   button.key.alphakey .main{color:var(--alpha)}
-  button.key.nav .main{font-size:26px}
+  button.key.nav .main{font-size:22px}
   body.shift-on button.key.shiftkey{box-shadow:0 0 0 2px var(--shift),0 2px 0 rgba(40,44,50,.45)}
   body.alpha-on button.key.alphakey{box-shadow:0 0 0 2px var(--alpha),0 2px 0 rgba(40,44,50,.45)}
   /* SHIFT held: labels animate-swap — yellow shift label slides to center & grows,
      white primary slides to upper-left & shrinks. Colors unchanged, only size/position. */
   body.shift-on button.key.hassh .main{
     top:3px;left:4px;transform:translate(0,0);
-    font-size:11px;line-height:1;
+    font-size:10px;line-height:1;
   }
   body.shift-on button.key.hassh .sh{
     top:50%;left:50%;transform:translate(-50%,-50%);
-    font-size:clamp(17px,3.4vh,26px);
+    font-size:clamp(15px,2.7vh,22px);
   }
   sup{font-size:.7em;vertical-align:super}
 
@@ -160,7 +160,7 @@
   .hist-item .he{font-size:15px;color:#5a626c}
   .hist-item .hr{font-size:20px;color:#1b1f25;font-weight:700}
   .hist-empty{color:#8a929c;text-align:center;margin-top:30px;font-size:14px}
-  @media (max-width:340px){button.key{font-size:18px}}
+  @media (max-width:340px){button.key{font-size:16px}}
 </style>
 </head>
 <body>
@@ -227,6 +227,9 @@ mf.smartMode=false;
 mf.smartFence=true;
 mf.popoverPolicy="off";
 mf.placeholderSymbol="▯";
+/* Ans is an atomic macro: cursor can't enter it, serializes as \Ans.
+   captureSelection makes it behave as a single solid token. */
+mf.macros={...mf.macros,Ans:{def:"\\mathrm{Ans}",captureSelection:true}};
 document.getElementById("mfWrap").appendChild(mf);
 
 const out=new MathfieldElement();
@@ -384,7 +387,7 @@ function action(k,shifted){
     case"del":mf.executeCommand("deleteBackward");break;
     case"ac":mf.setValue("");out.setValue("");S.lastExact=S.lastDec=null;break;
     case"eq":evaluate();break;
-    case"ans":mf.insert("\\mathrm{Ans}",{focus:true});break;
+    case"ans":mf.insert("\\Ans",{focus:true});break;
     case"mplus":memAdd(shifted?-1:1);break;
     case"rcl":if(shifted){/* STO stub */}else if(S.mem)mf.insert(String(S.mem),{focus:true});break;
     case"eng":shifted?mf.insert("\\imaginaryI",{focus:true}):engResult();break;   // SHIFT+ENG = i
@@ -395,8 +398,10 @@ function action(k,shifted){
 }
 
 /* ---------- evaluate ---------- */
+/* \Ans is a MathLive macro CE doesn't know; expand to \mathrm{Ans} (symbol Ans) for parsing */
+const ceLatex=s=>s.replace(/\\Ans(?![A-Za-z])/g,"\\mathrm{Ans}");
 function evaluate(){
-  const latex=mf.getValue("latex");
+  const latex=ceLatex(mf.getValue("latex"));
   if(!latex||/\\placeholder/.test(latex)){return;}
   try{
     ce.angularUnit=ANG[S.mode];
@@ -464,7 +469,7 @@ function showResult(){
   if(v!=null)out.setValue(v);
 }
 function memAdd(sign){
-  const latex=mf.getValue("latex");
+  const latex=ceLatex(mf.getValue("latex"));
   try{const v=numOf(ce.parse(latex).N());if(isFinite(v)){S.mem+=sign*v;flags();}}catch(e){}
 }
 
@@ -496,7 +501,8 @@ document.getElementById("histClear").addEventListener("click",()=>{S.hist=[];sav
 histList.addEventListener("click",e=>{
   const it=e.target.closest(".hist-item");if(!it)return;
   const h=S.hist[+it.dataset.i];if(!h)return;
-  mf.setValue(h.e);histEl.hidden=true;mf.focus();
+  // history stores \mathrm{Ans} (renders in plain math-fields); restore atomic \Ans for editing
+  mf.setValue(h.e.replace(/\\mathrm\{Ans\}/g,"\\Ans"));histEl.hidden=true;mf.focus();
 });
 
 /* ---------- physical keyboard passthrough (let MathLive handle) ---------- */
@@ -524,9 +530,13 @@ flags();
     try{const v=numOf(ce.parse(tex).N());if(!near(v,exp)){console.error("FAIL",tex,v,"!=",exp);ok=false;}}
     catch(err){console.error("ERR",tex,err.message);ok=false;}
   }
-  // Ans as live symbol
-  try{ce.assign("Ans",7);const v=numOf(ce.parse("\\mathrm{Ans}+1").N());if(!near(v,8)){console.error("FAIL Ans",v);ok=false;}ce.assign("Ans",0);}
-  catch(err){console.error("ERR Ans",err.message);ok=false;}
+  // Ans as live symbol (via \Ans macro -> ceLatex expansion)
+  try{
+    ce.assign("Ans",9);
+    if(!near(numOf(ce.parse(ceLatex("\\Ans+1")).N()),10)){console.error("FAIL Ans+1");ok=false;}
+    if(!near(numOf(ce.parse(ceLatex("\\sqrt{\\Ans}")).N()),3)){console.error("FAIL sqrt(Ans)");ok=false;}
+    ce.assign("Ans",0);
+  }catch(err){console.error("ERR Ans",err.message);ok=false;}
   // complex: (2+3i)(1-i) = 5+i
   try{const z=ce.parse("(2+3i)(1-i)").N();if(!near(z.re,5)||!near(z.im,1)){console.error("FAIL complex",z.latex);ok=false;}}
   catch(err){console.error("ERR complex",err.message);ok=false;}
