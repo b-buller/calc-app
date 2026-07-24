@@ -54,19 +54,20 @@
   }
   .flags{display:flex;align-items:center;gap:9px;font-size:11px;font-weight:700;min-height:15px;letter-spacing:.5px;font-family:"Courier New",monospace}
   .flags span{visibility:hidden}
+  #fMode{display:inline-block;width:11ch;text-align:left}
   .flags span.on{visibility:visible}
   .histbtn{visibility:visible;background:none;border:none;color:var(--lcd-ink);font-size:16px;line-height:1;cursor:pointer;padding:0 2px;opacity:.85}
   #graphBtn{margin-left:auto}
   #mf{
     flex:1 1 auto;width:100%;min-height:2.2em;
     border:none;background:transparent;color:var(--lcd-ink);
-    font-size:24px;overflow:auto;
+    font-size:clamp(30px,6vh,44px);overflow:auto;
     --caret-color:#1b1f19;--selection-background-color:#9db08a;--contains-highlight-background-color:transparent;
     --smart-fence-color:#1b1f19;
   }
   #out{
     width:100%;border:none;background:transparent;color:var(--lcd-ink);
-    font-size:30px;text-align:right;min-height:1.2em;pointer-events:none;
+    font-size:clamp(36px,7vh,52px);text-align:right;min-height:1.2em;pointer-events:none;
     display:flex;justify-content:flex-end;
   }
   math-field{outline:none}
@@ -370,8 +371,8 @@ function keyHTML(d){
 }
 const DISC=`<div class="navpad" style="grid-column:span 2">
   <button class="nav-btn" data-k="left" aria-label="Left">&#9664;</button>
-  <button class="nav-btn" data-k="up" aria-label="Up">&#9650;</button>
   <button class="nav-btn" data-k="down" aria-label="Down">&#9660;</button>
+  <button class="nav-btn" data-k="up" aria-label="Up">&#9650;</button>
   <button class="nav-btn" data-k="right" aria-label="Right">&#9654;</button>
 </div>`;
 document.getElementById("pad6").innerHTML=GRID6.map(k=>k==="DISC"?DISC:keyHTML(KMAP[k])).join("");
@@ -513,7 +514,7 @@ function flags(){
   document.getElementById("fShift").classList.toggle("on",S.shift);
   document.getElementById("fAlpha").classList.toggle("on",S.alpha);
   document.getElementById("fM").classList.toggle("on",S.mem!==0);
-  document.getElementById("fMode").textContent=S.mode;
+  const fm=document.getElementById("fMode");fm.textContent=S.mode;fm.style.transform="translateX("+MODES.indexOf(S.mode)*3.5+"ch)";
   document.body.classList.toggle("shift-on",S.shift);
   document.body.classList.toggle("alpha-on",S.alpha);
 }
