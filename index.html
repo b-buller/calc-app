@@ -133,6 +133,9 @@
   button.key.nav .main{font-size:22px}
   body.shift-on button.key.shiftkey{box-shadow:0 0 0 2px var(--shift),0 2px 0 rgba(40,44,50,.45)}
   body.alpha-on button.key.alphakey{box-shadow:0 0 0 2px var(--alpha),0 2px 0 rgba(40,44,50,.45)}
+  body.form-on button.key.form-choice{box-shadow:0 0 0 2px var(--shift),0 2px 0 rgba(40,44,50,.45)}
+  body.form-on button.key.form-choice .main{font-size:clamp(10px,1.9vh,14px);white-space:normal;width:92%;line-height:1.05}
+  body.form-on button:disabled{opacity:.35}
   /* SHIFT held: labels animate-swap — yellow shift label slides to center & grows,
      white primary slides to upper-left & shrinks. Colors unchanged, only size/position. */
   body.shift-on button.key.hassh .main{
@@ -189,7 +192,7 @@
         <span id="fShift">S</span>
         <span id="fAlpha">A</span>
         <span id="fM">M</span>
-        <span id="fMode" class="on">DEG</span>
+        <span id="fMode" class="on" role="status" aria-live="polite">DEG</span>
         <button id="graphBtn" class="histbtn" aria-label="Graph">&#8767;</button>
         <button id="histBtn" class="histbtn" aria-label="History">&#9719;</button>
       </div>
@@ -245,7 +248,7 @@ ce.declare("nPr",{signature:"(number,number)->number",evaluate:(args)=>{
 }});
 
 /* ---------- state ---------- */
-const S={shift:false,alpha:false,mode:"DEG",mem:0,sd:"exact",lastExact:null,lastDec:null,lastNum:NaN,hist:[]};
+const S={shift:false,alpha:false,formMode:false,formOptions:[],mode:"DEG",mem:0,sd:"exact",lastExact:null,lastDec:null,lastNum:NaN,lastInput:"",lastMode:null,hist:[]};
 ce.assign("Ans",0);   // Ans is a live symbol; updated after each evaluation
 const HKEY="calc-history";
 const MODES=["DEG","RAD","GRAD"];
@@ -288,7 +291,7 @@ const KEYS=[
   K("up","▲","fn nav","cmd","moveUp"),
   K("down","▼","fn nav","cmd","moveDown"),
   K("right","▶","fn nav","cmd","moveToNextChar"),
-  K("sd","S⇔D","fn txt","act"),
+  K("sd","S⇔D","fn txt","act",null,"FORM"),
 
   K("inv","x⁻¹","fn","ins","^{-1}"),
   K("frac","▯/▯","fn","ins","\\frac{#0}{#0}","▯⌐","\\frac{#0}{#0}"),
@@ -363,12 +366,13 @@ const GRID5=[
   "1","2","3","add","sub",
   "0","dot","exp","ans","eq",
 ];
-function keyHTML(d){
+function keyContent(d){
   const sh=d.sh?`<span class="sh">${esc(d.sh)}</span>`:"";
   const al=d.al?`<span class="al">${esc(d.al)}</span>`:"";
   // main labels are internal constants; may contain markup like <sup>
-  return `<button class="key ${d.cls}${d.sh?" hassh":""}" data-k="${d.k}">${sh}${al}<span class="main">${d.main}</span></button>`;
+  return `${sh}${al}<span class="main">${d.main}</span>`;
 }
+function keyHTML(d){return `<button class="key ${d.cls}${d.sh?" hassh":""}" data-k="${d.k}">${keyContent(d)}</button>`;}
 const DISC=`<div class="navpad" style="grid-column:span 2">
   <button class="nav-btn" data-k="left" aria-label="Left">&#9664;</button>
   <button class="nav-btn" data-k="down" aria-label="Down">&#9660;</button>
@@ -385,12 +389,19 @@ const pads=document.getElementById("pads");
 pads.addEventListener("pointerdown",e=>{
   const btn=e.target.closest("button[data-k]");if(!btn)return;
   e.preventDefault();
-  press(KMAP[btn.dataset.k]);
+  if(S.formMode){
+    if(btn.dataset.form!=null)chooseForm(+btn.dataset.form);
+    else if(btn.dataset.k==="ac")exitFormMode();
+  }else press(KMAP[btn.dataset.k]);
   if(navigator.vibrate)navigator.vibrate(6);
 });
 /* keyboard/accessibility: still handle click for non-pointer activation */
 pads.addEventListener("click",e=>{
-  if(e.detail===0){const btn=e.target.closest("button[data-k]");if(btn)press(KMAP[btn.dataset.k]);}
+  if(e.detail===0){
+    const btn=e.target.closest("button[data-k]");if(!btn)return;
+    if(S.formMode){if(btn.dataset.form!=null)chooseForm(+btn.dataset.form);else if(btn.dataset.k==="ac")exitFormMode();}
+    else press(KMAP[btn.dataset.k]);
+  }
 });
 
 function press(d){
@@ -413,15 +424,15 @@ function press(d){
     action(d.k,shifted);
   }
   S.shift=false;S.alpha=false;flags();
-  mf.focus();
+  if(!S.formMode)mf.focus();
 }
 
 function action(k,shifted){
   switch(k){
     case"mode":S.mode=MODES[(MODES.indexOf(S.mode)+1)%3];break;
-    case"sd":S.sd=S.sd==="exact"?"decimal":"exact";showResult();break;
+    case"sd":if(shifted)enterFormMode();else{S.sd=S.sd==="exact"?"decimal":"exact";showResult();}break;
     case"del":mf.executeCommand("deleteBackward");break;
-    case"ac":mf.setValue("");out.setValue("");S.lastExact=S.lastDec=null;break;
+    case"ac":mf.setValue("");out.setValue("");clearResult();break;
     case"eq":evaluate();break;
     case"ans":mf.insert("\\Ans",{focus:true});break;
     case"mplus":memAdd(shifted?-1:1);break;
@@ -436,8 +447,9 @@ function action(k,shifted){
 /* ---------- evaluate ---------- */
 /* \Ans is a MathLive macro CE doesn't know; expand to \mathrm{Ans} (symbol Ans) for parsing */
 const ceLatex=s=>s.replace(/\\Ans(?![A-Za-z])/g,"\\mathrm{Ans}");
+function clearResult(){S.lastExact=S.lastDec=null;S.lastNum=NaN;S.lastInput="";S.lastMode=null;}
 function evaluate(){
-  const latex=ceLatex(mf.getValue("latex"));
+  const input=mf.getValue("latex"),latex=ceLatex(input);
   if(!latex||/\\placeholder/.test(latex)){return;}
   try{
     ce.angularUnit=ANG[S.mode];
@@ -447,8 +459,10 @@ function evaluate(){
     const re=typeof dec.re==="number"?dec.re:NaN;
     const im=typeof dec.im==="number"?dec.im:0;
     const bad=dec.isNaN||(!isFinite(re)&&!(im&&isFinite(im)))||(im&&!isFinite(im));
-    if(bad){out.setValue("\\text{Math ERROR}");return;}
+    if(bad){clearResult();out.setValue("\\text{Math ERROR}");return;}
     ce.assign("Ans",ex);
+    S.lastInput=input;
+    S.lastMode=S.mode;
     if(im!==0){
       // exact: reduce CE's raw radicals (sqrt(-12) -> 2√3 i); decimal: a+bi
       S.lastExact=reduceRadicals(ex.latex);
@@ -461,6 +475,7 @@ function evaluate(){
     showResult();
     pushHistory(latex,S.sd==="exact"?S.lastExact:S.lastDec);
   }catch(err){
+    clearResult();
     out.setValue("\\text{Syntax ERROR}");
   }
 }
@@ -504,6 +519,90 @@ function showResult(){
   const v=S.sd==="exact"?S.lastExact:S.lastDec;
   if(v!=null)out.setValue(v);
 }
+
+/* ---------- FORM picker ---------- */
+const FORM_KEYS=GRID6.filter(k=>k!=="DISC"&&KMAP[k]?.cls.includes("fn"));
+function formOptions(){
+  const forms=[],seen=new Set();
+  const add=(label,latex)=>{if(latex!=null&&!seen.has(latex)){seen.add(latex);forms.push({label,latex});}};
+  const exactLabel=/\\frac/.test(S.lastExact)?"Fraction":/\\sqrt/.test(S.lastExact)?"Radical":"Exact";
+  add(exactLabel,S.lastExact);
+  add("Decimal",S.lastDec);
+
+  const x=S.lastNum;
+  if(isFinite(x)){
+    if(isFinite(x*100))add("Percent",`${fmtNum(x*100)}\\%`);
+    if(x!==0){
+      const [mantissa,exponent]=x.toExponential(9).split("e"),e=+exponent,m=String(parseFloat(mantissa));
+      add("Scientific",e===0?m:`${m}\\times10^{${e}}`);
+      const ee=e-((e%3)+3)%3,mm=fmtNum(+mantissa*10**(e-ee));
+      add("Engineering",ee===0?mm:`${mm}\\times10^{${ee}}`);
+    }
+  }
+
+  const frac=String(S.lastExact).replace(/\\,/g,"").match(/^(-?)\\frac\{(\d+)\}\{(\d+)\}$/);
+  if(frac){
+    const n=BigInt(frac[2]),d=BigInt(frac[3]),whole=n/d,rem=n%d;
+    if(whole&&rem)add("Mixed",`${frac[1]}${whole}\\frac{${rem}}{${d}}`);
+  }
+
+  const radical=String(S.lastExact).match(/^(-?)(\d*)\\sqrt\{(\d+)\}$/);
+  if(radical){
+    const c=+(radical[2]||1),r=+radical[3],sign=radical[1];
+    add("Expanded √",`${sign}\\sqrt{${c*c*r}}`);
+    add("Power",`${sign}${c===1?"":c+"\\cdot"}${r}^{\\frac{1}{2}}`);
+  }
+
+  const trig=String(S.lastInput).match(/^\\(sin|cos|tan|csc|sec|cot)\((.*)\)$/);
+  if(trig&&S.lastMode===S.mode){
+    ce.angularUnit=ANG[S.mode];
+    const a=trig[2],identities={
+      sin:[["1 / csc",`\\frac{1}{\\csc(${a})}`],["tan / sec",`\\frac{\\tan(${a})}{\\sec(${a})}`]],
+      cos:[["1 / sec",`\\frac{1}{\\sec(${a})}`],["cot / csc",`\\frac{\\cot(${a})}{\\csc(${a})}`]],
+      tan:[["1 / cot",`\\frac{1}{\\cot(${a})}`],["sin / cos",`\\frac{\\sin(${a})}{\\cos(${a})}`]],
+      csc:[["1 / sin",`\\frac{1}{\\sin(${a})}`],["sec / tan",`\\frac{\\sec(${a})}{\\tan(${a})}`]],
+      sec:[["1 / cos",`\\frac{1}{\\cos(${a})}`],["csc / cot",`\\frac{\\csc(${a})}{\\cot(${a})}`]],
+      cot:[["1 / tan",`\\frac{1}{\\tan(${a})}`],["cos / sin",`\\frac{\\cos(${a})}{\\sin(${a})}`]],
+    };
+    for(const [label,latex] of identities[trig[1]]){
+      if(label.startsWith("1 /")&&Math.abs(S.lastNum)<1e-12)continue;
+      try{
+        const v=numOf(ce.parse(latex).N());
+        if(isFinite(v)&&Math.abs(v-S.lastNum)<=1e-9*Math.max(1,Math.abs(S.lastNum)))add(label,latex);
+      }catch(e){}
+    }
+  }
+  return forms.slice(0,FORM_KEYS.length);
+}
+function enterFormMode(){
+  const forms=formOptions();if(!forms.length)return;
+  S.formMode=true;S.formOptions=forms;
+  pads.querySelectorAll("button").forEach(btn=>btn.disabled=true);
+  FORM_KEYS.forEach((k,i)=>{
+    const btn=pads.querySelector(`button[data-k="${k}"]`),form=forms[i];
+    btn.classList.toggle("form-choice",!!form);btn.classList.toggle("form-empty",!form);
+    if(form){btn.dataset.form=i;btn.disabled=false;btn.setAttribute("aria-label",`Use ${form.label} form`);btn.innerHTML=`<span class="main">${esc(form.label)}</span>`;}
+    else{delete btn.dataset.form;btn.disabled=true;btn.innerHTML='<span class="main">—</span>';}
+  });
+  const ac=pads.querySelector('button[data-k="ac"]');ac.disabled=false;ac.innerHTML='<span class="main">BACK</span>';
+  mf.blur();flags();pads.querySelector("button.form-choice")?.focus();
+}
+function exitFormMode(){
+  S.formMode=false;S.formOptions=[];
+  pads.querySelectorAll("button").forEach(btn=>btn.disabled=false);
+  FORM_KEYS.forEach(k=>{
+    const btn=pads.querySelector(`button[data-k="${k}"]`);delete btn.dataset.form;btn.removeAttribute("aria-label");
+    btn.classList.remove("form-choice","form-empty");btn.innerHTML=keyContent(KMAP[k]);
+  });
+  pads.querySelector('button[data-k="ac"]').innerHTML=keyContent(KMAP.ac);
+  S.shift=S.alpha=false;flags();mf.focus();
+}
+function chooseForm(i){
+  const form=S.formOptions[i];if(!form)return;
+  out.setValue(form.latex);
+  if(form.latex===S.lastDec)S.sd="decimal";else if(form.latex===S.lastExact)S.sd="exact";
+  exitFormMode();
+}
 function memAdd(sign){
   const latex=ceLatex(mf.getValue("latex"));
   try{const v=numOf(ce.parse(latex).N());if(isFinite(v)){S.mem+=sign*v;flags();}}catch(e){}
@@ -514,9 +613,10 @@ function flags(){
   document.getElementById("fShift").classList.toggle("on",S.shift);
   document.getElementById("fAlpha").classList.toggle("on",S.alpha);
   document.getElementById("fM").classList.toggle("on",S.mem!==0);
-  const fm=document.getElementById("fMode");fm.textContent=S.mode;fm.style.transform="translateX("+MODES.indexOf(S.mode)*3.5+"ch)";
+  const fm=document.getElementById("fMode");fm.textContent=S.formMode?"FORM":S.mode;fm.style.transform="translateX("+(S.formMode?0:MODES.indexOf(S.mode)*3.5)+"ch)";
   document.body.classList.toggle("shift-on",S.shift);
   document.body.classList.toggle("alpha-on",S.alpha);
+  document.body.classList.toggle("form-on",S.formMode);
 }
 
 /* ---------- history (localStorage) ---------- */
@@ -704,11 +804,11 @@ document.getElementById("gZoomIn").addEventListener("click",()=>zoomAt((G.x0+G.x
 document.getElementById("gZoomOut").addEventListener("click",()=>zoomAt((G.x0+G.x1)/2,(G.y0+G.y1)/2,1.5));
 document.getElementById("gReset").addEventListener("click",()=>{G.x0=-10;G.x1=10;autoFitY();drawGraph();});
 window.addEventListener("resize",()=>{if(G.open){sizeCanvas();drawGraph();}});
-window.addEventListener("keydown",e=>{if(e.key==="Escape"&&G.open)closeGraph();});
+window.addEventListener("keydown",e=>{if(e.key==="Escape"){if(G.open)closeGraph();else if(S.formMode)exitFormMode();}});
 
 /* ---------- physical keyboard passthrough (let MathLive handle) ---------- */
 window.addEventListener("keydown",e=>{
-  if(e.key==="Enter"||e.key==="="){e.preventDefault();evaluate();}
+  if((e.key==="Enter"||e.key==="=")&&!S.formMode){e.preventDefault();evaluate();}
 });
 
 /* ---------- PWA ---------- */
@@ -746,6 +846,29 @@ flags();
   // surd reduction
   const surds={"\\sqrt{-12}":"2\\sqrt{3}\\imaginaryI","\\sqrt{-4}":"2\\imaginaryI","\\sqrt{-2}":"\\sqrt{2}\\imaginaryI","\\sqrt{12}":"2\\sqrt{3}","\\sqrt{-1}":"\\imaginaryI"};
   for(const[k,v]of Object.entries(surds)){if(reduceRadicals(k)!==v){console.error("FAIL surd",k,"->",reduceRadicals(k),"exp",v);ok=false;}}
+  // FORM representations preserve the same value
+  const saved={lastExact:S.lastExact,lastDec:S.lastDec,lastNum:S.lastNum,lastInput:S.lastInput,lastMode:S.lastMode};
+  try{
+    const value=numOf(ce.parse("\\csc(20)").N());
+    Object.assign(S,{lastExact:"\\csc(20)",lastDec:fmtNum(value),lastNum:value,lastInput:"\\csc(20)",lastMode:"DEG"});
+    for(const form of formOptions()){
+      const v=numOf(ce.parse(form.latex).N());
+      if(!near(v,value)){console.error("FAIL form",form.label,form.latex,v,"!=",value);ok=false;}
+    }
+    Object.assign(S,{lastExact:"1",lastDec:"1",lastNum:1,lastInput:"\\cos(0)",lastMode:"DEG"});
+    if(formOptions().some(form=>form.label==="cot / csc")){console.error("FAIL singular trig form");ok=false;}
+    Object.assign(S,{lastExact:"0",lastDec:"0",lastNum:0,lastInput:"\\sin(0)",lastMode:"DEG"});
+    if(formOptions().some(form=>form.label==="1 / csc")){console.error("FAIL undefined reciprocal form");ok=false;}
+    Object.assign(S,{lastExact:"10^{308}",lastDec:"1e+308",lastNum:1e308,lastInput:"10^{308}",lastMode:"DEG"});
+    if(formOptions().some(form=>form.label==="Percent")){console.error("FAIL overflowing percent form");ok=false;}
+    Object.assign(S,{lastExact:"\\frac{1\\,001}{3}",lastDec:"333.6666667",lastNum:1001/3,lastInput:"\\frac{1001}{3}",lastMode:"DEG"});
+    if(!formOptions().some(form=>form.label==="Mixed")){console.error("FAIL grouped mixed form");ok=false;}
+    Object.assign(S,{lastExact:"\\frac{9007199254740993}{5}",lastDec:"1801439850948198.6",lastNum:1801439850948198.6,lastInput:"\\frac{9007199254740993}{5}",lastMode:"DEG"});
+    if(formOptions().find(form=>form.label==="Mixed")?.latex!=="1801439850948198\\frac{3}{5}"){console.error("FAIL precise mixed form");ok=false;}
+    Object.assign(S,{lastExact:"10^{-323}",lastDec:"1e-323",lastNum:1e-323,lastInput:"10^{-323}",lastMode:"DEG"});
+    if(formOptions().some(form=>form.latex.includes("Infinity"))){console.error("FAIL subnormal form");ok=false;}
+  }catch(err){console.error("ERR forms",err.message);ok=false;}
+  finally{Object.assign(S,saved);}
   console.log(ok?"calc self-test: PASS":"calc self-test: FAIL");
 })();
 </script>
