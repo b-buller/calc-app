@@ -709,6 +709,7 @@ function fmtTick(v,step){
   const d=Math.max(0,-Math.floor(Math.log10(step)));
   return String(parseFloat(v.toFixed(Math.min(10,d+1))));
 }
+const isWhole=v=>isFinite(v)&&Math.abs(v-Math.round(v))<1e-10;
 
 function drawGraph(){
   const W=gCv.width/(window.devicePixelRatio||1),H=gCv.height/(window.devicePixelRatio||1);
@@ -753,6 +754,17 @@ function drawGraph(){
     pen=true;prev=y;
   }
   gCtx.stroke();
+
+  // Integer lattice points; skip when zoomed out far enough that dots would merge.
+  const first=Math.ceil(G.x0),last=Math.floor(G.x1),pointLimit=G.slow?Math.min(40,W/8):W/8;
+  if(Number.isSafeInteger(first)&&Number.isSafeInteger(last)&&last-first<=pointLimit){
+    gCtx.fillStyle="#8f3b52";
+    for(let x=first;x<=last;x++){
+      const y=G.f(x),whole=Math.round(y);
+      if(!isWhole(y)||whole<G.y0||whole>G.y1)continue;
+      gCtx.beginPath();gCtx.arc(X(x),Y(whole),3.5,0,Math.PI*2);gCtx.fill();
+    }
+  }
 }
 
 /* zoom keeping data point (cx,cy) fixed on screen */
@@ -846,6 +858,7 @@ flags();
   // surd reduction
   const surds={"\\sqrt{-12}":"2\\sqrt{3}\\imaginaryI","\\sqrt{-4}":"2\\imaginaryI","\\sqrt{-2}":"\\sqrt{2}\\imaginaryI","\\sqrt{12}":"2\\sqrt{3}","\\sqrt{-1}":"\\imaginaryI"};
   for(const[k,v]of Object.entries(surds)){if(reduceRadicals(k)!==v){console.error("FAIL surd",k,"->",reduceRadicals(k),"exp",v);ok=false;}}
+  if(!isWhole(3.9999999999999996)||isWhole(4.000000001)){console.error("FAIL whole-number tolerance");ok=false;}
   // FORM representations preserve the same value
   const saved={lastExact:S.lastExact,lastDec:S.lastDec,lastNum:S.lastNum,lastInput:S.lastInput,lastMode:S.lastMode};
   try{
