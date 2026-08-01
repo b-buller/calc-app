@@ -646,23 +646,78 @@ const gEl=document.getElementById("graph"),gCv=document.getElementById("gCanvas"
       gEq=document.getElementById("gEq"),gCtx=gCv.getContext("2d");
 const G={f:null,slow:false,x0:-10,x1:10,y0:-10,y1:10,open:false};
 
-/* build y=f(x) evaluator: compiled JS when possible, boxed-eval fallback.
-   compile() is radians-only in some CE builds — probe sin under the current
-   angle mode and fall back to (slower) boxed evaluation if they disagree. */
+/* MathJSON -> plain JS fn(x). This CE build has no expr.compile(), and boxed
+   eval (~50-200µs/point) is far too slow for per-pixel envelope sampling.
+   Covers the calculator's function set; returns null for anything unknown
+   (caller falls back to boxed eval). toRad converts trig args per angle mode. */
+function compileFn(json,toRad){
+  const T={Sin:Math.sin,Cos:Math.cos,Tan:Math.tan,Csc:y=>1/Math.sin(y),Sec:y=>1/Math.cos(y),Cot:y=>1/Math.tan(y)};
+  const IT={Arcsin:Math.asin,Arccos:Math.acos,Arctan:Math.atan,Acsc:y=>Math.asin(1/y),Asec:y=>Math.acos(1/y),Acot:y=>Math.atan(1/y)};
+  const c=node=>{
+    if(typeof node==="number")return ()=>node;
+    if(typeof node==="string"){
+      if(node==="x")return x=>x;
+      if(node==="Pi")return ()=>Math.PI;
+      if(node==="ExponentialE")return ()=>Math.E;
+      if(node==="Half")return ()=>0.5;
+      return null;
+    }
+    if(node&&typeof node==="object"&&!Array.isArray(node)){
+      if("num"in node){const v=parseFloat(node.num);return ()=>v;}
+      if("sym"in node)return c(node.sym);
+      if("fn"in node)return c(node.fn);
+      return null;
+    }
+    if(!Array.isArray(node))return null;
+    const [op,...args]=node,a=args.map(c);
+    if(a.some(f=>!f))return null;
+    switch(op){
+      case"Add":return x=>{let s=0;for(const f of a)s+=f(x);return s;};
+      case"Multiply":return x=>{let s=1;for(const f of a)s*=f(x);return s;};
+      case"Subtract":return x=>a[0](x)-a[1](x);
+      case"Divide":case"Rational":return x=>a[0](x)/a[1](x);
+      case"Negate":return x=>-a[0](x);
+      case"Power":return x=>Math.pow(a[0](x),a[1](x));
+      case"Root":return x=>{const b=a[0](x),n=a[1](x);return b<0&&n%2===1?-Math.pow(-b,1/n):Math.pow(b,1/n);};
+      case"Sqrt":return x=>Math.sqrt(a[0](x));
+      case"Exp":return x=>Math.exp(a[0](x));
+      case"Ln":return x=>Math.log(a[0](x));
+      case"Log":return a[1]?x=>Math.log(a[0](x))/Math.log(a[1](x)):x=>Math.log10(a[0](x));
+      case"Abs":return x=>Math.abs(a[0](x));
+      case"Factorial":return x=>{const n=a[0](x);if(!Number.isInteger(n)||n<0||n>170)return NaN;let p=1;for(let i=2;i<=n;i++)p*=i;return p;};
+      default:
+        if(op in T){const g=T[op],f=a[0];return x=>g(f(x)*toRad);}
+        if(op in IT){const g=IT[op],f=a[0];return x=>g(f(x))/toRad;}
+        return null;
+    }
+  };
+  return c(json);
+}
+
+/* build y=f(x) evaluator: own-compiled JS verified against CE at a few points;
+   mismatch or unsupported ops -> (slow) boxed-eval fallback */
 function makeFn(latex){
   ce.angularUnit=ANG[S.mode];
   const expr=ce.parse(latex);
-  let fn=null;
-  try{fn=expr.compile();}catch(e){}
-  if(fn&&S.mode!=="RAD"&&/\\(arc)?(sin|cos|tan|csc|sec|cot)/.test(latex)){
+  const boxed=t=>{
     try{
-      const probe=ce.parse("\\sin(30)");
-      if(Math.abs(probe.N().re-probe.compile()({}))>1e-9)fn=null;
-    }catch(e){fn=null;}
+      const v=expr.subs({x:ce.number(t)}).N();
+      const im=typeof v.im==="number"?v.im:0;
+      if(Math.abs(im)>1e-12)return NaN;              // complex: not on real graph
+      return typeof v.re==="number"?v.re:NaN;
+    }catch(e){return NaN;}
+  };
+  const toRad=S.mode==="DEG"?Math.PI/180:S.mode==="GRAD"?Math.PI/200:1;
+  let fn=null;
+  try{fn=compileFn(expr.json,toRad);}catch(e){}
+  if(fn){
+    for(const t of[0.7,2.3,-1.9]){
+      const va=fn(t),vb=boxed(t);
+      if(isFinite(va)!==isFinite(vb)||(isFinite(va)&&Math.abs(va-vb)>1e-6*Math.max(1,Math.abs(vb)))){fn=null;break;}
+    }
   }
   G.slow=!fn;
-  if(fn)return x=>{try{const v=fn({x});return typeof v==="number"?v:NaN;}catch(e){return NaN;}};
-  return x=>{try{return numOf(expr.subs({x:ce.number(x)}).N());}catch(e){return NaN;}};
+  return fn||boxed;
 }
 
 function autoFitY(){
@@ -711,6 +766,27 @@ function fmtTick(v,step){
 }
 const isWhole=v=>isFinite(v)&&Math.abs(v-Math.round(v))<1e-10;
 
+/* coalesce redraws to one per frame — pan/pinch/wheel fire many events per frame */
+let gRaf=0;
+function scheduleDraw(){if(!gRaf)gRaf=requestAnimationFrame(()=>{gRaf=0;drawGraph();});}
+
+/* per-pixel-column [min,max,center] envelope: immune to aliasing when zoomed
+   out — oscillating/steep curves render as their true vertical extent per
+   column; center is the exact curve sample used for smooth polyline drawing */
+function sampleColumns(f,x0,x1,cols,sub){
+  const out=new Float64Array(cols*3);
+  for(let c=0;c<cols;c++){
+    let lo=Infinity,hi=-Infinity,mid=NaN;
+    for(let s=0;s<=sub;s++){
+      const y=f(x0+(c+s/sub)*(x1-x0)/cols);
+      if(s===sub>>1)mid=y;
+      if(isFinite(y)){if(y<lo)lo=y;if(y>hi)hi=y;}
+    }
+    out[c*3]=lo;out[c*3+1]=hi;out[c*3+2]=mid;   // lo>hi => empty column
+  }
+  return out;
+}
+
 function drawGraph(){
   const W=gCv.width/(window.devicePixelRatio||1),H=gCv.height/(window.devicePixelRatio||1);
   if(W<10||H<10)return;
@@ -741,19 +817,48 @@ function drawGraph(){
 
   // curve
   if(!G.f)return;
-  const n=G.slow?120:Math.ceil(W);           // ponytail: boxed eval is slow, coarser sampling
-  const jump=(G.y1-G.y0)*4;
-  gCtx.strokeStyle="#8f3b52";gCtx.lineWidth=2;gCtx.lineJoin="round";
-  gCtx.beginPath();
-  let pen=false,prev=NaN;
-  for(let i=0;i<=n;i++){
-    const x=G.x0+(G.x1-G.x0)*i/n,y=G.f(x);
-    if(!isFinite(y)||(pen&&Math.abs(y-prev)>jump)){pen=false;prev=y;continue;}
-    const px=X(x),py=Math.max(-H,Math.min(2*H,Y(y)));
-    pen?gCtx.lineTo(px,py):gCtx.moveTo(px,py);
-    pen=true;prev=y;
+  gCtx.strokeStyle="#8f3b52";gCtx.lineWidth=2;gCtx.lineJoin="round";gCtx.lineCap="round";
+  const yr=G.y1-G.y0;
+  if(G.slow){
+    // ponytail: boxed eval is slow — coarse polyline, aliasing accepted on this path
+    const n=200,jump=yr*4;
+    gCtx.beginPath();
+    let pen=false,prev=NaN;
+    for(let i=0;i<=n;i++){
+      const x=G.x0+(G.x1-G.x0)*i/n,y=G.f(x);
+      if(!isFinite(y)||(pen&&Math.abs(y-prev)>jump)){pen=false;prev=y;continue;}
+      const px=X(x),py=Math.max(-H,Math.min(2*H,Y(y)));
+      pen?gCtx.lineTo(px,py):gCtx.moveTo(px,py);
+      pen=true;prev=y;
+    }
+    gCtx.stroke();
+  }else{
+    // one column per DEVICE pixel — retina-sharp; CSS-pixel columns look jagged on 2x screens
+    const dpr=window.devicePixelRatio||1,cols=Math.max(1,Math.ceil(W*dpr)),cw=W/cols;
+    const env=sampleColumns(G.f,G.x0,G.x1,cols,4);
+    // smooth anti-aliased polyline through true curve samples; vertical bars
+    // only where a column's span is genuinely steep/oscillating (>6px)
+    const line=new Path2D(),bars=new Path2D();
+    let pTop=NaN,pBot=NaN,pen=false;
+    for(let c=0;c<cols;c++){
+      const lo=env[c*3],hi=env[c*3+1];
+      // gap, or asymptote-style flip blowing far past both edges (tan): lift pen
+      if(lo>hi||(lo<0&&hi>0&&hi-lo>8*yr&&lo<G.y0-yr&&hi>G.y1+yr)){pTop=NaN;pen=false;continue;}
+      let top=Y(hi),bot=Y(lo);
+      if(!isNaN(pTop)){if(top>pBot)top=pBot;if(bot<pTop)bot=pTop;}   // connect columns
+      pTop=top;pBot=bot;
+      const px=(c+.5)*cw;
+      if(bot-top>6){
+        const t=Math.max(top,-4),b=Math.min(bot,H+4);
+        if(b>t){bars.moveTo(px,t);bars.lineTo(px,b);}
+      }
+      const yc=isFinite(env[c*3+2])?env[c*3+2]:(lo+hi)/2;
+      const py=Math.max(-8,Math.min(H+8,Y(yc)));
+      pen?line.lineTo(px,py):line.moveTo(px,py);
+      pen=true;
+    }
+    gCtx.stroke(bars);gCtx.stroke(line);
   }
-  gCtx.stroke();
 
   // Integer lattice points; skip when zoomed out far enough that dots would merge.
   const first=Math.ceil(G.x0),last=Math.floor(G.x1),pointLimit=G.slow?Math.min(40,W/8):W/8;
@@ -767,11 +872,13 @@ function drawGraph(){
   }
 }
 
-/* zoom keeping data point (cx,cy) fixed on screen */
+/* zoom keeping data point (cx,cy) fixed on screen; clamped so float precision survives */
 function zoomAt(cx,cy,k){
+  const rx=(G.x1-G.x0)*k,ry=(G.y1-G.y0)*k;
+  if(rx<1e-9||rx>4e9||ry<1e-9||ry>4e9)return;
   G.x0=cx-(cx-G.x0)*k;G.x1=cx+(G.x1-cx)*k;
   G.y0=cy-(cy-G.y0)*k;G.y1=cy+(G.y1-cy)*k;
-  drawGraph();
+  scheduleDraw();
 }
 const gDataX=px=>G.x0+px/gCv.getBoundingClientRect().width*(G.x1-G.x0);
 const gDataY=py=>{const h=gCv.getBoundingClientRect().height;return G.y0+(h-py)/h*(G.y1-G.y0);};
@@ -790,16 +897,19 @@ gCv.addEventListener("pointermove",e=>{
     const dx=(e.offsetX-p.x)/r.width*(G.x1-G.x0),dy=(e.offsetY-p.y)/r.height*(G.y1-G.y0);
     G.x0-=dx;G.x1-=dx;G.y0+=dy;G.y1+=dy;
     p.x=e.offsetX;p.y=e.offsetY;
-    drawGraph();
+    scheduleDraw();
   }else if(gPtrs.size===2){
-    const pts=[...gPtrs.values()];
+    const pts=[...gPtrs.values()],r=gCv.getBoundingClientRect();
+    const ox=(pts[0].x+pts[1].x)/2,oy=(pts[0].y+pts[1].y)/2;
     const d0=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
     p.x=e.offsetX;p.y=e.offsetY;
+    const nx=(pts[0].x+pts[1].x)/2,ny=(pts[0].y+pts[1].y)/2;
     const d1=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
-    if(d0>0&&d1>0){
-      const mx=(pts[0].x+pts[1].x)/2,my=(pts[0].y+pts[1].y)/2;
-      zoomAt(gDataX(mx),gDataY(my),d0/d1);
-    }
+    // pan with the midpoint, then zoom about it — two-finger drag now pans too
+    const dx=(nx-ox)/r.width*(G.x1-G.x0),dy=(ny-oy)/r.height*(G.y1-G.y0);
+    G.x0-=dx;G.x1-=dx;G.y0+=dy;G.y1+=dy;
+    if(d0>0&&d1>0)zoomAt(gDataX(nx),gDataY(ny),d0/d1);
+    scheduleDraw();
   }
 });
 const gPtrEnd=e=>gPtrs.delete(e.pointerId);
@@ -814,8 +924,8 @@ document.getElementById("graphBtn").addEventListener("click",openGraph);
 document.getElementById("gClose").addEventListener("click",closeGraph);
 document.getElementById("gZoomIn").addEventListener("click",()=>zoomAt((G.x0+G.x1)/2,(G.y0+G.y1)/2,1/1.5));
 document.getElementById("gZoomOut").addEventListener("click",()=>zoomAt((G.x0+G.x1)/2,(G.y0+G.y1)/2,1.5));
-document.getElementById("gReset").addEventListener("click",()=>{G.x0=-10;G.x1=10;autoFitY();drawGraph();});
-window.addEventListener("resize",()=>{if(G.open){sizeCanvas();drawGraph();}});
+document.getElementById("gReset").addEventListener("click",()=>{G.x0=-10;G.x1=10;autoFitY();scheduleDraw();});
+window.addEventListener("resize",()=>{if(G.open){sizeCanvas();scheduleDraw();}});
 window.addEventListener("keydown",e=>{if(e.key==="Escape"){if(G.open)closeGraph();else if(S.formMode)exitFormMode();}});
 
 /* ---------- physical keyboard passthrough (let MathLive handle) ---------- */
@@ -882,6 +992,27 @@ flags();
     if(formOptions().some(form=>form.latex.includes("Infinity"))){console.error("FAIL subnormal form");ok=false;}
   }catch(err){console.error("ERR forms",err.message);ok=false;}
   finally{Object.assign(S,saved);}
+  // graph envelope: zoomed-out sin must still span its amplitude (no aliasing dropout)
+  try{
+    const env=sampleColumns(Math.sin,0,1000,100,4);
+    for(let c=0;c<100;c++){
+      if(!(env[c*3]<-0.3&&env[c*3+1]>0.3&&isFinite(env[c*3+2]))){console.error("FAIL graph envelope col",c,env[c*3],env[c*3+1]);ok=false;break;}
+    }
+    const gap=sampleColumns(()=>NaN,0,1,4,4);
+    if(gap[0]<=gap[1]){console.error("FAIL envelope gap");ok=false;}
+  }catch(err){console.error("ERR envelope",err.message);ok=false;}
+  // graph compiler vs known values (DEG trig, roots, logs, factorial)
+  try{
+    const D=Math.PI/180;
+    const cc=[["\\sin(x)",30,0.5,D],["x^2+1",3,10,1],["\\log_{2}(x)",8,3,1],["\\sqrt[3]{x}",-8,-2,1],
+      ["x!",5,120,1],["\\csc(x)",30,2,D],["\\arcsin(x)",0.5,30,D],["\\frac{x}{2}\\pi",2,Math.PI,1]];
+    for(const[tex,xv,expv,rad]of cc){
+      const f=compileFn(ce.parse(tex).json,rad);
+      if(!f){console.error("FAIL compile null",tex);ok=false;continue;}
+      if(!near(f(xv),expv)){console.error("FAIL compile",tex,f(xv),"!=",expv);ok=false;}
+    }
+    if(compileFn(ce.parse("\\operatorname{nPr}(x,2)").json,1)!==null){console.error("FAIL compile should reject unknown op");ok=false;}
+  }catch(err){console.error("ERR compile",err.message);ok=false;}
   console.log(ok?"calc self-test: PASS":"calc self-test: FAIL");
 })();
 </script>
