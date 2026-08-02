@@ -107,11 +107,12 @@
     user-select:none;transition:transform .04s,filter .04s;line-height:1.05;
   }
   button.key:active{transform:translateY(1px);filter:brightness(1.32);box-shadow:0 0 0 rgba(0,0,0,.4)}
-  button.key .sh{position:absolute;top:3px;left:4px;font-size:10px;color:var(--shift);font-weight:700;white-space:nowrap;transform:translate(0,0);
+  button.key .sh{position:absolute;top:3px;left:4px;font-size:clamp(10px,1.9vh,13px);color:var(--shift);font-weight:700;white-space:nowrap;transform:translate(0,0);
     transition:top .16s ease,left .16s ease,transform .16s ease,font-size .16s ease}
-  button.key .al{position:absolute;top:2px;right:3px;font-size:10px;color:var(--alpha);font-weight:700}
+  button.key .al{position:absolute;top:2px;right:3px;font-size:clamp(10px,1.9vh,13px);color:var(--alpha);font-weight:700;white-space:nowrap;
+    transition:top .16s ease,left .16s ease,right .16s ease,transform .16s ease,font-size .16s ease}
   button.key .main{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:inherit;pointer-events:none;white-space:nowrap;
-    transition:top .16s ease,left .16s ease,transform .16s ease,font-size .16s ease}
+    transition:top .16s ease,left .16s ease,right .16s ease,transform .16s ease,font-size .16s ease}
   button.key.fn .main{font-size:clamp(15px,2.7vh,22px)}
   button.key.num,button.key.op,button.key.eq{
     background:linear-gradient(180deg,var(--blk),var(--blk2));border-color:var(--blk-edge);
@@ -140,10 +141,19 @@
      white primary slides to upper-left & shrinks. Colors unchanged, only size/position. */
   body.shift-on button.key.hassh .main{
     top:3px;left:4px;transform:translate(0,0);
-    font-size:10px;line-height:1;
+    font-size:clamp(10px,1.9vh,13px);line-height:1;
   }
   body.shift-on button.key.hassh .sh{
     top:50%;left:50%;transform:translate(-50%,-50%);
+    font-size:clamp(15px,2.7vh,22px);
+  }
+  /* ALPHA held: same swap for the red alpha labels (upper-right corner) */
+  body.alpha-on button.key.hasal .main{
+    top:2px;left:auto;right:3px;transform:translate(0,0);
+    font-size:clamp(10px,1.9vh,13px);line-height:1;
+  }
+  body.alpha-on button.key.hasal .al{
+    top:50%;left:50%;right:auto;transform:translate(-50%,-50%);
     font-size:clamp(15px,2.7vh,22px);
   }
   sup{font-size:.7em;vertical-align:super}
@@ -266,7 +276,7 @@ document.getElementById("mfWrap").appendChild(mf);
 /* Ans is an atomic macro: cursor can't enter it, serializes as \Ans.
    captureSelection makes it behave as a single solid token.
    MUST run after append — the macros getter throws pre-mount. */
-mf.macros={...mf.macros,Ans:{def:"\\mathrm{Ans}",captureSelection:true}};
+mf.macros={...mf.macros,Ans:{def:"\\mathrm{Ans}",captureSelection:true},Ran:{def:"\\mathrm{Ran\\#}",captureSelection:true}};
 
 const out=new MathfieldElement();
 out.id="out";
@@ -372,7 +382,7 @@ function keyContent(d){
   // main labels are internal constants; may contain markup like <sup>
   return `${sh}${al}<span class="main">${d.main}</span>`;
 }
-function keyHTML(d){return `<button class="key ${d.cls}${d.sh?" hassh":""}" data-k="${d.k}">${keyContent(d)}</button>`;}
+function keyHTML(d){return `<button class="key ${d.cls}${d.sh?" hassh":""}${d.al?" hasal":""}" data-k="${d.k}">${keyContent(d)}</button>`;}
 const DISC=`<div class="navpad" style="grid-column:span 2">
   <button class="nav-btn" data-k="left" aria-label="Left">&#9664;</button>
   <button class="nav-btn" data-k="down" aria-label="Down">&#9660;</button>
@@ -412,8 +422,8 @@ function press(d){
   if(d.k==="alpha"){S.alpha=!S.alpha;S.shift=false;flags();return;}
 
   if(d.t==="ins"){
-    if(shifted&&d.k==="dot"){                        // Ran#
-      mf.insert(String(Math.floor(Math.random()*1000)/1000),{focus:true});
+    if(shifted&&d.k==="dot"){                        // Ran#: atomic token, rolls fresh on =
+      mf.insert("\\Ran",{focus:true});
     }else{
       const latex=(shifted&&d.shval)?d.shval:(alphaed&&d.alval)?d.alval:d.val;
       if(latex!=null)mf.insert(latex,{selectionMode:"placeholder",focus:true});
@@ -435,25 +445,89 @@ function action(k,shifted){
     case"ac":mf.setValue("");out.setValue("");clearResult();break;
     case"eq":evaluate();break;
     case"ans":mf.insert("\\Ans",{focus:true});break;
+    case"intg":
+      mf.insert(shifted?"\\frac{\\mathrm{d}}{\\mathrm{d}x}\\left(#0,#?\\right)"
+                       :"\\int_{#?}^{#?}\\left(#0\\right)\\mathrm{d}x",
+                {selectionMode:"placeholder",focus:true});
+      break;
     case"mplus":memAdd(shifted?-1:1);break;
     case"rcl":if(shifted){/* STO stub */}else if(S.mem)mf.insert(String(S.mem),{focus:true});break;
     case"eng":shifted?mf.insert("\\imaginaryI",{focus:true}):engResult();break;   // SHIFT+ENG = i
     case"on":mf.focus();break;
-    // stubs (future): calc, intg, hyp, dms
+    // stubs (future): calc, hyp, dms
     default:break;
   }
 }
 
 /* ---------- evaluate ---------- */
-/* \Ans is a MathLive macro CE doesn't know; expand to \mathrm{Ans} (symbol Ans) for parsing */
-const ceLatex=s=>s.replace(/\\Ans(?![A-Za-z])/g,"\\mathrm{Ans}");
+/* \Ans is a MathLive macro CE doesn't know; expand to \mathrm{Ans} (symbol Ans) for parsing.
+   \Ran rolls a fresh Casio-style random (0.000-0.999) at each evaluation. */
+const ceLatex=s=>s.replace(/\\Ans(?![A-Za-z])/g,"\\mathrm{Ans}")
+                 .replace(/\\Ran(?![A-Za-z])/g,()=>String(Math.floor(Math.random()*1000)/1000));
 function clearResult(){S.lastExact=S.lastDec=null;S.lastNum=NaN;S.lastInput="";S.lastMode=null;}
+
+/* ---------- numeric calculus ----------
+   This CE build parses Integrate/D but can't evaluate them numerically (N()->NaN).
+   Rewrite those MathJSON nodes to numbers before evaluation, using compileFn. */
+function calcToRad(){return S.mode==="DEG"?Math.PI/180:S.mode==="GRAD"?Math.PI/200:1;}
+function fnOfJson(body){
+  let f=null;try{f=compileFn(body,calcToRad());}catch(e){}
+  if(f)return f;
+  const b=ce.box(body);   // boxed fallback for ops the mini-compiler doesn't know
+  return t=>{try{
+    const v=b.subs({x:ce.number(t)}).N();
+    const im=typeof v.im==="number"?v.im:0;
+    if(Math.abs(im)>1e-12)return NaN;
+    return typeof v.re==="number"?v.re:NaN;
+  }catch(e){return NaN;}};
+}
+function numOfJson(j){try{return numOf(ce.box(j).N());}catch(e){return NaN;}}
+/* composite Simpson; endpoints nudged so integrable singularities (ln x at 0) survive */
+function simpson(f,a,b){
+  if(!isFinite(a)||!isFinite(b))return NaN;
+  if(a===b)return 0;
+  const n=800,h=(b-a)/n,eps=(b-a)*1e-9;
+  let fa=f(a);if(!isFinite(fa))fa=f(a+eps);
+  let fb=f(b);if(!isFinite(fb))fb=f(b-eps);
+  if(!isFinite(fa)||!isFinite(fb))return NaN;
+  let s=fa+fb;
+  for(let i=1;i<n;i++){const v=f(a+i*h);if(!isFinite(v))return NaN;s+=v*(i%2?4:2);}
+  return s*h/3;
+}
+/* 4th-order central difference */
+function deriv(f,p){
+  if(!isFinite(p))return NaN;
+  const h=1e-4*Math.max(1,Math.abs(p));
+  return (f(p-2*h)-8*f(p-h)+8*f(p+h)-f(p+2*h))/(12*h);
+}
+function rewriteCalc(node,st){
+  if(!Array.isArray(node))return node;
+  const [op,...args]=node;
+  if(op==="Integrate"&&args.length===2&&Array.isArray(args[1])&&args[1][0]==="Limits"){
+    let body=args[0];
+    if(Array.isArray(body)&&body[0]==="Function")body=body[1];
+    if(Array.isArray(body)&&body[0]==="Block")body=body[1];
+    const a=numOfJson(rewriteCalc(args[1][2],st)),b=numOfJson(rewriteCalc(args[1][3],st));
+    st.hit=true;
+    const v=simpson(fnOfJson(body),a,b);
+    return isFinite(v)?v:{num:"NaN"};
+  }
+  if(op==="D"&&Array.isArray(args[0])&&args[0][0]==="Tuple"){
+    const p=numOfJson(rewriteCalc(args[0][2],st));
+    st.hit=true;
+    const v=deriv(fnOfJson(args[0][1]),p);
+    return isFinite(v)?v:{num:"NaN"};
+  }
+  return [op,...args.map(x=>rewriteCalc(x,st))];
+}
 function evaluate(){
   const input=mf.getValue("latex"),latex=ceLatex(input);
   if(!latex||/\\placeholder/.test(latex)){return;}
   try{
     ce.angularUnit=ANG[S.mode];
-    const expr=ce.parse(latex);
+    let expr=ce.parse(latex);
+    const st={hit:false},rj=rewriteCalc(expr.json,st);
+    if(st.hit)expr=ce.box(rj);          // ∫/d-dx replaced by computed numbers
     const dec=expr.N();
     const ex=expr.evaluate();
     const re=typeof dec.re==="number"?dec.re:NaN;
@@ -471,6 +545,7 @@ function evaluate(){
     }else{
       S.lastExact=reduceRadicals(ex.latex);S.lastDec=fmtNum(re);S.lastNum=re;
     }
+    if(st.hit)S.lastExact=S.lastDec;   // ∫/d-dx results are numeric approximations
     S.sd="exact";           // each new result shows exact by default (S⇔D toggles it)
     showResult();
     pushHistory(latex,S.sd==="exact"?S.lastExact:S.lastDec);
@@ -1013,6 +1088,25 @@ flags();
     }
     if(compileFn(ce.parse("\\operatorname{nPr}(x,2)").json,1)!==null){console.error("FAIL compile should reject unknown op");ok=false;}
   }catch(err){console.error("ERR compile",err.message);ok=false;}
+  // numeric calculus: ∫ and d/dx rewritten to numbers before evaluation
+  try{
+    const savedMode=S.mode;S.mode="RAD";ce.angularUnit="rad";
+    const evalCalc=tex=>{const st={hit:false};return numOf(ce.box(rewriteCalc(ce.parse(tex).json,st)).N());};
+    const nearish=(a,b)=>Math.abs(a-b)<1e-6;
+    if(!nearish(evalCalc("\\int_{0}^{1}\\left(x^2\\right)\\mathrm{d}x"),1/3)){console.error("FAIL int x^2");ok=false;}
+    if(!nearish(evalCalc("\\int_{0}^{\\pi}\\left(\\sin(x)\\right)\\mathrm{d}x"),2)){console.error("FAIL int sin");ok=false;}
+    if(!nearish(evalCalc("2+\\int_{0}^{1}\\left(x\\right)\\mathrm{d}x"),2.5)){console.error("FAIL nested int");ok=false;}
+    if(!nearish(evalCalc("\\frac{\\mathrm{d}}{\\mathrm{d}x}\\left(x^2,3\\right)"),6)){console.error("FAIL ddx x^2");ok=false;}
+    if(!nearish(evalCalc("\\frac{\\mathrm{d}}{\\mathrm{d}x}\\left(\\sin(x),0\\right)"),1)){console.error("FAIL ddx sin");ok=false;}
+    if(isFinite(evalCalc("\\int_{-1}^{1}\\left(\\frac{1}{x}\\right)\\mathrm{d}x"))){console.error("FAIL int singular should be NaN");ok=false;}
+    S.mode=savedMode;
+  }catch(err){console.error("ERR calculus",err.message);ok=false;}
+  // Ran#: expands to a fresh 0-0.999 number at evaluation time
+  try{
+    const r=parseFloat(ceLatex("\\Ran"));
+    if(!(r>=0&&r<1)){console.error("FAIL Ran# range",r);ok=false;}
+    if(ceLatex("\\Ans+\\Ran").indexOf("\\mathrm{Ans}")!==0){console.error("FAIL Ran/Ans combo");ok=false;}
+  }catch(err){console.error("ERR Ran#",err.message);ok=false;}
   console.log(ok?"calc self-test: PASS":"calc self-test: FAIL");
 })();
 </script>
